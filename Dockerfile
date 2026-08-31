@@ -30,8 +30,8 @@ ENV UV_SYSTEM_PYTHON=1 \
 
 WORKDIR /app/mcp
 
-# deps layer — context is mcp/
-COPY pyproject.toml uv.lock ./
+# deps layer — context is mcp/ (README needed for hatchling readme validation)
+COPY pyproject.toml uv.lock README.md ./
 
 RUN uv sync --frozen --no-dev
 
