@@ -22,7 +22,7 @@ ENV_JARS_DIR = "REMUS_JARS_DIR"
 ENV_AUTH_TOKEN = "MCP_AUTH_TOKEN"
 ENV_BASE_DIR = "REMUS_BASE_DIR"
 ENV_XSL_DIR = "REMUS_XSL_DIR"
-
+ENV_DATA_DIR = "REMUS_DATA_DIR"
 # Root Paths
 PACKAGE_ROOT = Path(__file__).parent.resolve()
 REPO_ROOT = PACKAGE_ROOT.parent.resolve()
@@ -84,4 +84,24 @@ def get_xsl_path(lang: str) -> Path:
         path = REPO_ROOT / "xslt" / "remus" / filename
     if not path.exists():
         raise FileNotFoundError(f"XSL stylesheet not found: {path}")
+
+
+def get_data_dir() -> Path:
+    """Return path to data directory for storing projects."""
+    if os.environ.get(ENV_DATA_DIR):
+        path = Path(os.environ[ENV_DATA_DIR])
+    elif Path("/data").exists() and Path("/data").is_dir():
+        path = Path("/data")
+    else:
+        path = REPO_ROOT / "data"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def resolve_project_path(target_path: str) -> Path:
+    """Resolve project path: if relative, resolve relative to data directory."""
+    path = Path(target_path)
+    if not path.is_absolute():
+        path = get_data_dir() / path
+    return path
     return path

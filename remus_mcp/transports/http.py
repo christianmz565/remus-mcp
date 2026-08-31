@@ -1,9 +1,11 @@
 """HTTP Transport for MCP using StreamableHTTPSessionManager."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import Any
 
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -11,14 +13,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from ..config import DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT
+
+
 class StreamableMCPApp:
     """ASGI application wrapper that routes /mcp requests to StreamableHTTPSessionManager
     and delegates all other routes/lifespan events to Starlette.
     """
 
-    def __init__(self, session_manager: Any, starlette_app: Starlette, auth_token: str | None = None):
+    def __init__(
+        self, session_manager: Any, starlette_app: Starlette, auth_token: str | None = None
+    ):
         self.session_manager = session_manager
         self.starlette_app = starlette_app
         self.auth_token = auth_token
@@ -65,7 +70,13 @@ def create_app(server: Any, auth_token: str | None = None) -> Any:
 
     return StreamableMCPApp(session_manager, starlette_app, auth_token=auth_token)
 
-def run_http(server: Any, host: str = DEFAULT_HTTP_HOST, port: int = DEFAULT_HTTP_PORT, auth_token: str | None = None) -> None:
+
+def run_http(
+    server: Any,
+    host: str = DEFAULT_HTTP_HOST,
+    port: int = DEFAULT_HTTP_PORT,
+    auth_token: str | None = None,
+) -> None:
     import uvicorn
 
     app = create_app(server, auth_token)

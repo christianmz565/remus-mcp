@@ -1,5 +1,7 @@
 """Value table enums."""
+
 from enum import Enum
+
 
 class RemType(str, Enum):
     section = "section"

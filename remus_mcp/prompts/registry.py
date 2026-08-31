@@ -1,13 +1,46 @@
 """Prompts registry."""
 
+
 def register_prompts(server, session_manager):
     # Provide list_prompts impl
     def list_prompts_impl():
         return [
-            {"name": "create-requirement", "description": "Guide to create a requirement", "arguments": [{"name": "project_id", "required": True}, {"name": "type", "required": True}, {"name": "parent_section", "required": False}]},
-            {"name": "analyze-traces", "description": "Analyze trace coverage", "arguments": [{"name": "project_id", "required": True}, {"name": "source_type", "required": True}, {"name": "target_type", "required": True}]},
-            {"name": "generate-documentation", "description": "Generate HTML/PDF", "arguments": [{"name": "project_id", "required": True}, {"name": "document", "required": True}, {"name": "lang", "required": False}]},
-            {"name": "bulk-import", "description": "Bulk import XML", "arguments": [{"name": "project_id", "required": True}, {"name": "xml_path", "required": True}, {"name": "strategy", "required": False}]},
+            {
+                "name": "create-requirement",
+                "description": "Guide to create a requirement",
+                "arguments": [
+                    {"name": "project_id", "required": True},
+                    {"name": "type", "required": True},
+                    {"name": "parent_section", "required": False},
+                ],
+            },
+            {
+                "name": "analyze-traces",
+                "description": "Analyze trace coverage",
+                "arguments": [
+                    {"name": "project_id", "required": True},
+                    {"name": "source_type", "required": True},
+                    {"name": "target_type", "required": True},
+                ],
+            },
+            {
+                "name": "generate-documentation",
+                "description": "Generate HTML/PDF",
+                "arguments": [
+                    {"name": "project_id", "required": True},
+                    {"name": "document", "required": True},
+                    {"name": "lang", "required": False},
+                ],
+            },
+            {
+                "name": "bulk-import",
+                "description": "Bulk import XML",
+                "arguments": [
+                    {"name": "project_id", "required": True},
+                    {"name": "xml_path", "required": True},
+                    {"name": "strategy", "required": False},
+                ],
+            },
         ]
 
     def get_prompt_impl(name: str, arguments: dict):

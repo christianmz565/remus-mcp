@@ -1,15 +1,25 @@
 """Multi-file session manager + file locking + backup."""
+
 from __future__ import annotations
 
 import fcntl
 import hashlib
 import shutil
 import time
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from .jet.mdbtools import list_tables, export_table, execute_sql, max_oid, sql_escape, JetWriteNotSupported
+from .config import resolve_project_path
+from .jet.mdbtools import (
+    JetWriteNotSupported,
+    execute_sql,
+    export_table,
+    list_tables,
+    max_oid,
+    sql_escape,
+)
+
 
 @dataclass
 class ProjectSession:
@@ -17,7 +27,10 @@ class ProjectSession:
     project_id: str
     lock_fd: Any = None
     backup_path: Path | None = None
-    undo_stack: list[tuple[str, Path, int]] = field(default_factory=list)  # (project_id, backup_path, change_oid)
+    undo_stack: list[tuple[str, Path, int]] = field(
+        default_factory=list
+    )  # (project_id, backup_path, change_oid)
+
 
 class SessionManager:
     def __init__(self):
@@ -29,7 +42,7 @@ class SessionManager:
         return f"{path.stem}_{h}"
 
     def open_project(self, path: str) -> str:
-        p = Path(path)
+        p = resolve_project_path(path)
         if not p.exists():
             raise FileNotFoundError(f"File not found: {path}")
         if not p.suffix.lower() == ".rem":
@@ -37,7 +50,9 @@ class SessionManager:
         # Validate it's a REMUS DB by listing tables
         tables = list_tables(str(p))
         if "Objective" not in tables and "C_RequirementsSpecification" not in tables:
-            raise ValueError(f"Not a REMUS database (missing Objective/C_RequirementsSpecification): tables={tables[:10]}")
+            raise ValueError(
+                f"Not a REMUS database (missing Objective/C_RequirementsSpecification): tables={tables[:10]}"
+            )
         pid = self._project_id_for(p)
         if pid in self.projects:
             # Update path if same id but path changed? Just return
@@ -65,23 +80,29 @@ class SessionManager:
                 tables = []
             # Try to get doc counts
             docs = {}
-            for dtbl in ["C_RequirementsSpecification", "D_RequirementsSpecification", "DefectsSpecification", "ChangeRequestsSpecification"]:
+            for dtbl in [
+                "C_RequirementsSpecification",
+                "D_RequirementsSpecification",
+                "DefectsSpecification",
+                "ChangeRequestsSpecification",
+            ]:
                 try:
                     rows = export_table(str(sess.db_path), dtbl)
                     docs[dtbl] = len(rows)
                 except Exception:
                     docs[dtbl] = 0
-            out.append({
-                "project_id": pid,
-                "path": str(sess.db_path),
-                "name": sess.db_path.stem,
-                "tables": tables[:5],
-                "documents": docs,
-            })
+            out.append(
+                {
+                    "project_id": pid,
+                    "path": str(sess.db_path),
+                    "name": sess.db_path.stem,
+                    "tables": tables[:5],
+                    "documents": docs,
+                }
+            )
         return out
 
     def _acquire_lock(self, session: ProjectSession, timeout: float = 5.0):
-        import os
         start = time.time()
         fd = open(session.db_path, "rb")
         while True:
@@ -110,7 +131,9 @@ class SessionManager:
         shutil.copy2(session.db_path, backup_path)
         # Rotate keep last 5
         pattern = f"{session.db_path.name}.bak.*"
-        backups = sorted(session.db_path.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+        backups = sorted(
+            session.db_path.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True
+        )
         for old in backups[5:]:
             try:
                 old.unlink()
@@ -119,15 +142,19 @@ class SessionManager:
         session.backup_path = backup_path
         return backup_path
 
-    def mutate(self, project_id: str, tool_name: str, type_name: str | None = None, oid: int | None = None):
+    def mutate(
+        self, project_id: str, tool_name: str, type_name: str | None = None, oid: int | None = None
+    ):
         """Context manager for mutations: lock + backup + Change log + unlock."""
         session = self.get(project_id)
+
         class Ctx:
             def __enter__(inner_self):
                 self._acquire_lock(session)
                 backup = self._backup(session)
                 inner_self.backup = backup
                 return inner_self
+
             def __exit__(inner_self, exc_type, exc, tb):
                 if exc_type is not None:
                     # On error, restore backup
@@ -137,9 +164,12 @@ class SessionManager:
                         pass
                 self._release_lock(session)
                 return False
+
         return Ctx()
 
-    def append_change(self, project_id: str, tool_name: str, subject_oid: int | None, subject_type: str | None):
+    def append_change(
+        self, project_id: str, tool_name: str, subject_oid: int | None, subject_type: str | None
+    ):
         session = self.get(project_id)
         try:
             # Determine Change table max oid
@@ -149,6 +179,7 @@ class SessionManager:
             # Try to get type_code from mapping: keep as string representation insert as text if column is Text else int.
             # We'll try to insert with quoted values and let mdb-sql handle.
             import datetime
+
             now = datetime.datetime.now()
             # Jet date format: #mm/dd/yyyy hh:nn:ss# ? mdb-sql expects 'YYYY-MM-DD HH:MM:SS' ?
             # Use now isoformat as string
@@ -164,7 +195,7 @@ class SessionManager:
             except JetWriteNotSupported:
                 # fallback: ignore change log if write not supported (mdb-sql missing)
                 pass
-            except Exception as e:
+            except Exception:
                 # If column names mismatch, ignore
                 # e.g., subjectType may be integer column: try numeric fallback
                 try:

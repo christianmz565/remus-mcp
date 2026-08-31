@@ -73,9 +73,9 @@ VALUE_TABLES = {
 }
 
 WRITABLE_TYPES: set[str] = {
-    t for t in TYPE_TO_TABLE.keys()
-    if TYPE_TO_TABLE[t] not in VALUE_TABLES
-    and t not in {"change"}  # Change is system-managed
+    t
+    for t in TYPE_TO_TABLE
+    if TYPE_TO_TABLE[t] not in VALUE_TABLES and t not in {"change"}  # Change is system-managed
 }
 
 # Required fields per type (minimal, from schema NOT NULL + DTD)
@@ -118,40 +118,42 @@ REQUIRED_FIELDS: dict[str, list[str]] = {
 }
 
 # Ordered list for RemType enum values (excluding doc specs and internals)
-REM_TYPE_VALUES: list[str] = sorted([
-    "section",
-    "appendix",
-    "paragraph",
-    "graphic_file",
-    "glossary_item",
-    "organization",
-    "stakeholder",
-    "meeting",
-    "objective",
-    "actor",
-    "information_requirement",
-    "constraint_requirement",
-    "use_case",
-    "functional_requirement",
-    "non_functional_requirement",
-    "object_type",
-    "user_defined_value_type",
-    "association_type",
-    "system_operation",
-    "alternative",
-    "conflict",
-    "defect",
-    "change_request",
-    "traceability_matrix",
-    "attribute",
-    "component",
-    "role",
-    "parameter",
-    "invariant_expression",
-    "step",
-    "trace",
-    "c_requirements_specification",
-    "d_requirements_specification",
-    "defects_specification",
-    "change_requests_specification",
-])
+REM_TYPE_VALUES: list[str] = sorted(
+    [
+        "section",
+        "appendix",
+        "paragraph",
+        "graphic_file",
+        "glossary_item",
+        "organization",
+        "stakeholder",
+        "meeting",
+        "objective",
+        "actor",
+        "information_requirement",
+        "constraint_requirement",
+        "use_case",
+        "functional_requirement",
+        "non_functional_requirement",
+        "object_type",
+        "user_defined_value_type",
+        "association_type",
+        "system_operation",
+        "alternative",
+        "conflict",
+        "defect",
+        "change_request",
+        "traceability_matrix",
+        "attribute",
+        "component",
+        "role",
+        "parameter",
+        "invariant_expression",
+        "step",
+        "trace",
+        "c_requirements_specification",
+        "d_requirements_specification",
+        "defects_specification",
+        "change_requests_specification",
+    ]
+)

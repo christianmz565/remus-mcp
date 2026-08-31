@@ -1,12 +1,15 @@
 """Jackcess/UCanAccess fallback via JPype (lazy)."""
+
 from __future__ import annotations
 
-from ..config import get_jars_dir
 import pathlib
 import re
 from typing import Any
 
+from ..config import get_jars_dir
+
 _jvm_started = False
+
 
 def _ensure_jvm():
     global _jvm_started
@@ -14,7 +17,9 @@ def _ensure_jvm():
         return
     import os
     import shutil
+
     import jpype
+
     if jpype.isJVMStarted():
         _jvm_started = True
         return
@@ -26,14 +31,20 @@ def _ensure_jvm():
             java_path = pathlib.Path(java_bin).resolve()
             # Common layouts: <jdk>/bin/java -> <jdk> or <jdk>/lib/openjdk/bin/java -> <jdk>/lib/openjdk
             parent = java_path.parent.parent
-            if (parent / "lib" / "server" / "libjvm.so").exists() or (parent / "lib" / "libjvm.so").exists():
+            if (parent / "lib" / "server" / "libjvm.so").exists() or (
+                parent / "lib" / "libjvm.so"
+            ).exists():
                 os.environ["JAVA_HOME"] = str(parent)
             elif (parent / "lib" / "openjdk" / "lib" / "server" / "libjvm.so").exists():
                 os.environ["JAVA_HOME"] = str(parent / "lib" / "openjdk")
             elif parent.parent.name == "store":
                 # Nix store layout search
                 for candidate in parent.glob("**/libjvm.so"):
-                    os.environ["JAVA_HOME"] = str(candidate.parent.parent.parent if candidate.parent.name == "server" else candidate.parent.parent)
+                    os.environ["JAVA_HOME"] = str(
+                        candidate.parent.parent.parent
+                        if candidate.parent.name == "server"
+                        else candidate.parent.parent
+                    )
                     break
 
     jars_dir = get_jars_dir()
@@ -43,6 +54,8 @@ def _ensure_jvm():
 
     jpype.startJVM(classpath=[str(j) for j in jars])
     _jvm_started = True
+
+
 def _parse_sql_value(raw: str) -> Any:
     raw = raw.strip()
     if raw.upper() == "NULL":
@@ -62,13 +75,16 @@ def _parse_sql_value(raw: str) -> Any:
         pass
     return raw
 
+
 def _sql_unescape(s: str) -> str:
     return s.replace("''", "'")
+
 
 def execute_sql_via_jackcess(db_path: str, sql: str):
     _ensure_jvm()
     import jpype
     from jpype import JClass
+
     DBB = JClass("com.healthmarketscience.jackcess.DatabaseBuilder")
     File = JClass("java.io.File")
     HashMap = JClass("java.util.HashMap")
@@ -85,7 +101,11 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
         if sql_stripped.upper().startswith("INSERT INTO"):
             # Pattern: INSERT INTO [Table] ([col], ...) VALUES (...)
             # Extract table
-            m = re.match(r"INSERT\s+INTO\s+\[?([^\]\s]+)\]?\s*\(([^)]+)\)\s*VALUES\s*\((.+)\)", sql_stripped, re.IGNORECASE | re.DOTALL)
+            m = re.match(
+                r"INSERT\s+INTO\s+\[?([^\]\s]+)\]?\s*\(([^)]+)\)\s*VALUES\s*\((.+)\)",
+                sql_stripped,
+                re.IGNORECASE | re.DOTALL,
+            )
             if not m:
                 raise ValueError(f"Cannot parse INSERT: {sql}")
             table = m.group(1)
@@ -124,7 +144,23 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                     continue
                 lname = col_name.lower()
                 # FK to value tables: set to 1 if missing
-                if lname in ("importance","urgency","status","stability","avglifetimetime","maxlifetimetime","frequencytime","timeunit","timeunitvalue","termination","defectstatus","defecttype","changeRequestStatus","conflictstatus","ischecked"):
+                if lname in (
+                    "importance",
+                    "urgency",
+                    "status",
+                    "stability",
+                    "avglifetimetime",
+                    "maxlifetimetime",
+                    "frequencytime",
+                    "timeunit",
+                    "timeunitvalue",
+                    "termination",
+                    "defectstatus",
+                    "defecttype",
+                    "changeRequestStatus",
+                    "conflictstatus",
+                    "ischecked",
+                ):
                     # Check if column type is integer-like
                     col_type = str(col_obj.getType()).lower()
                     if "int" in col_type or "long" in col_type:
@@ -149,7 +185,15 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                         if col_obj is not None:
                             col_type = str(col_obj.getType()).lower()
                             lname = col_missing.lower()
-                            if lname in ("isuser","iscustomer","isdeveloper","isabstract","ischecked","isorderedbyname","isappendix"):
+                            if lname in (
+                                "isuser",
+                                "iscustomer",
+                                "isdeveloper",
+                                "isabstract",
+                                "ischecked",
+                                "isorderedbyname",
+                                "isappendix",
+                            ):
                                 hm.put(col_missing, jpype.JBoolean(False))
                             elif "date" in lname:
                                 hm.put(col_missing, JClass("java.util.Date")())
@@ -158,7 +202,17 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                             elif "text" in col_type or "memo" in col_type:
                                 hm.put(col_missing, "")
                             elif "int" in col_type or "long" in col_type:
-                                if lname in ("importance","urgency","status","stability","frequencytime","maxlifetimetime","avglifetimetime","termination","timeunitvalue"):
+                                if lname in (
+                                    "importance",
+                                    "urgency",
+                                    "status",
+                                    "stability",
+                                    "frequencytime",
+                                    "maxlifetimetime",
+                                    "avglifetimetime",
+                                    "termination",
+                                    "timeunitvalue",
+                                ):
                                     hm.put(col_missing, jpype.JInt(1))
                                 else:
                                     hm.put(col_missing, jpype.JInt(0))
@@ -171,7 +225,11 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                     raise
             db.flush()
         elif sql_stripped.upper().startswith("UPDATE"):
-            m = re.match(r"UPDATE\s+\[?([^\]\s]+)\]?\s+SET\s+(.+)\s+WHERE\s+\[?oid\]?\s*=\s*(\d+)", sql_stripped, re.IGNORECASE | re.DOTALL)
+            m = re.match(
+                r"UPDATE\s+\[?([^\]\s]+)\]?\s+SET\s+(.+)\s+WHERE\s+\[?oid\]?\s*=\s*(\d+)",
+                sql_stripped,
+                re.IGNORECASE | re.DOTALL,
+            )
             table = m.group(1)
             set_clause = m.group(2)
             oid = int(m.group(3))
@@ -218,7 +276,11 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
             tbl.updateRow(found)
             db.flush()
         elif sql_stripped.upper().startswith("DELETE FROM"):
-            m = re.match(r"DELETE\s+FROM\s+\[?([^\]\s]+)\]?\s+WHERE\s+\[?oid\]?\s*=\s*(\d+)", sql_stripped, re.IGNORECASE)
+            m = re.match(
+                r"DELETE\s+FROM\s+\[?([^\]\s]+)\]?\s+WHERE\s+\[?oid\]?\s*=\s*(\d+)",
+                sql_stripped,
+                re.IGNORECASE,
+            )
             if not m:
                 # Also try DELETE without WHERE? but plan only uses where oid
                 mf = re.match(r"DELETE\s+FROM\s+\[?([^\]\s]+)\]?", sql_stripped, re.IGNORECASE)
@@ -268,6 +330,7 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
     finally:
         db.close()
 
+
 def _split_values(s: str):
     """Split CSV respecting single quotes."""
     res = []
@@ -277,7 +340,7 @@ def _split_values(s: str):
     while i < len(s):
         c = s[i]
         if c == "'":
-            if in_quote and i+1 < len(s) and s[i+1] == "'":
+            if in_quote and i + 1 < len(s) and s[i + 1] == "'":
                 cur += "''"
                 i += 2
                 continue
@@ -293,9 +356,11 @@ def _split_values(s: str):
         res.append(cur.strip())
     return res
 
+
 def _split_set_clause(s: str):
     # Split by comma outside quotes
     return _split_values(s)
+
 
 class JackcessEngine:
     def __init__(self, db_path: str):
@@ -303,8 +368,8 @@ class JackcessEngine:
 
     def insert(self, table: str, row: dict[str, Any]):
         _ensure_jvm()
-        import jpype
         from jpype import JClass
+
         DBB = JClass("com.healthmarketscience.jackcess.DatabaseBuilder")
         File = JClass("java.io.File")
         HashMap = JClass("java.util.HashMap")
@@ -322,6 +387,7 @@ class JackcessEngine:
     def update(self, table: str, oid: int, patch: dict[str, Any]):
         _ensure_jvm()
         from jpype import JClass
+
         DBB = JClass("com.healthmarketscience.jackcess.DatabaseBuilder")
         File = JClass("java.io.File")
         db = DBB.open(File(self.db_path))
@@ -347,6 +413,7 @@ class JackcessEngine:
     def delete(self, table: str, oid: int):
         _ensure_jvm()
         from jpype import JClass
+
         DBB = JClass("com.healthmarketscience.jackcess.DatabaseBuilder")
         File = JClass("java.io.File")
         db = DBB.open(File(self.db_path))
@@ -362,6 +429,7 @@ class JackcessEngine:
             db.flush()
         finally:
             db.close()
+
 
 def get_jackcess_engine(db_path: str) -> JackcessEngine:
     return JackcessEngine(db_path)

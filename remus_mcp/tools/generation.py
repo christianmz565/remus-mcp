@@ -1,4 +1,5 @@
 """HTML generation via Wine msxml3."""
+
 from __future__ import annotations
 
 import os
@@ -14,7 +15,9 @@ from ..config import (
     SUBPROCESS_TIMEOUT_SECONDS,
     get_xsl_path,
 )
+
 _lxml_ns_initialized = False
+
 
 def _init_lxml_namespaces():
     global _lxml_ns_initialized
@@ -81,8 +84,12 @@ def _init_lxml_namespaces():
         return "".join(f"<p>{p.replace(chr(10), '<br/>')}</p>" for p in paragraphs if p.strip())
 
     rem_ns["bool2space"] = _bool2space
-    rem_ns["toLowerCase"] = lambda context, s: "".join(str(x) for x in s).lower() if isinstance(s, list) else str(s or "").lower()
-    rem_ns["toUpperCase"] = lambda context, s: "".join(str(x) for x in s).upper() if isinstance(s, list) else str(s or "").upper()
+    rem_ns["toLowerCase"] = lambda context, s: (
+        "".join(str(x) for x in s).lower() if isinstance(s, list) else str(s or "").lower()
+    )
+    rem_ns["toUpperCase"] = lambda context, s: (
+        "".join(str(x) for x in s).upper() if isinstance(s, list) else str(s or "").upper()
+    )
     rem_ns["isMadejaObject"] = _is_madeja
     rem_ns["getMadejaPrefix"] = _get_madeja_prefix
     rem_ns["getMadejaName"] = _get_madeja_name
@@ -90,7 +97,9 @@ def _init_lxml_namespaces():
 
     _lxml_ns_initialized = True
 
+
 _init_lxml_namespaces()
+
 
 def render_html(
     session_manager,
@@ -147,7 +156,9 @@ def render_html(
 
         cmd = ["wine", "cscript", "//NoLogo", str(vbs_path), str(xml_path), str(xsl_abs)]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_SECONDS)
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_SECONDS
+            )
             if r.returncode == 0 and r.stdout.strip():
                 html_content = r.stdout
                 Path(out_html).write_text(html_content, encoding="utf-8")
@@ -161,7 +172,9 @@ def render_html(
             _init_lxml_namespaces()
             from lxml import etree
 
-            xml_parser = etree.XMLParser(resolve_entities=False, load_dtd=True, attribute_defaults=True)
+            xml_parser = etree.XMLParser(
+                resolve_entities=False, load_dtd=True, attribute_defaults=True
+            )
             try:
                 xml_doc = etree.parse(str(xml_path), xml_parser)
             except Exception:
@@ -198,7 +211,13 @@ def render_html(
         elif shutil.which("chromium"):
             try:
                 subprocess.run(
-                    ["chromium", "--headless", "--disable-gpu", f"--print-to-pdf={pdf_path}", out_html],
+                    [
+                        "chromium",
+                        "--headless",
+                        "--disable-gpu",
+                        f"--print-to-pdf={pdf_path}",
+                        out_html,
+                    ],
                     capture_output=True,
                     timeout=SUBPROCESS_TIMEOUT_SECONDS,
                     check=True,
@@ -212,7 +231,9 @@ def render_html(
             except Exception as e:
                 raise RuntimeError(f"PDF_GENERATION_FAILED: chromium failed: {e}") from e
         else:
-            raise RuntimeError("PDF_CONVERTER_NOT_FOUND: Neither wkhtmltopdf nor chromium is available")
+            raise RuntimeError(
+                "PDF_CONVERTER_NOT_FOUND: Neither wkhtmltopdf nor chromium is available"
+            )
 
     html_trunc = html_content[:MCP_RESPONSE_MAX_HTML] if html_content else ""
     return {"html": html_trunc, "path": out_html, "warnings": warnings, "project_id": project_id}

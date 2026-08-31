@@ -1,7 +1,7 @@
 """Bidirectional XML import/export DTD-aware, ISO-8859-1."""
+
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -9,7 +9,7 @@ from typing import Any
 from lxml import etree
 
 from ..config import get_dtd_path
-from ..jet.mdbtools import export_table, execute_sql, max_oid, sql_escape
+from ..jet.mdbtools import execute_sql, export_table, sql_escape
 from ..jet.schema import TYPE_TO_TABLE
 
 NS = "http://rem.lsi.us.es"
@@ -49,8 +49,10 @@ TYPE_TO_XMLTAG = {
 
 XMLTAG_TO_TYPE = {v: k for k, v in TYPE_TO_XMLTAG.items()}
 
+
 def _dtd_path() -> str:
     return str(get_dtd_path())
+
 
 def _create_text_element(parent, tag: str, text: str | None):
     if text is None:
@@ -58,6 +60,7 @@ def _create_text_element(parent, tag: str, text: str | None):
     el = etree.SubElement(parent, f"{{{NS}}}{tag}")
     # Handle REM_TEXT with possible refs? Simplified as plain text
     el.text = str(text)
+
 
 def _parse_oid(oid_s: Any) -> int:
     if oid_s is None:
@@ -67,7 +70,14 @@ def _parse_oid(oid_s: Any) -> int:
     except Exception as e:
         raise ValueError(f"INVALID_OID: {oid_s}") from e
 
-def export_xml(session_manager, project_id: str, document: str | None = None, filter_type: str | None = None, filter_ids: list[int] | None = None) -> dict[str, Any]:
+
+def export_xml(
+    session_manager,
+    project_id: str,
+    document: str | None = None,
+    filter_type: str | None = None,
+    filter_ids: list[int] | None = None,
+) -> dict[str, Any]:
     session = session_manager.get(project_id)
     db_path = str(session.db_path)
     # Build tree
@@ -100,22 +110,40 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
             minor = etree.SubElement(ver_el, f"{{{NS}}}minor")
             minor.text = str(first.get("versionMinor", 0) or 0)
             date_el = etree.SubElement(ver_el, f"{{{NS}}}date")
-            y = etree.SubElement(date_el, f"{{{NS}}}year"); y.text = "2024"
-            m = etree.SubElement(date_el, f"{{{NS}}}month"); m.text = "1"
-            d = etree.SubElement(date_el, f"{{{NS}}}day"); d.text = "1"
-            _create_text_element(spec_el, "comments", str(first.get("comments", "Ninguno") or "Ninguno"))
+            y = etree.SubElement(date_el, f"{{{NS}}}year")
+            y.text = "2024"
+            m = etree.SubElement(date_el, f"{{{NS}}}month")
+            m.text = "1"
+            d = etree.SubElement(date_el, f"{{{NS}}}day")
+            d.text = "1"
+            _create_text_element(
+                spec_el, "comments", str(first.get("comments", "Ninguno") or "Ninguno")
+            )
         else:
             # Generate valid ID
-            fallback_oid = "1" if spec_tag.startswith("c_") else "2" if spec_tag.startswith("d_") else "3" if spec_tag.startswith("defects") else "4"
+            fallback_oid = (
+                "1"
+                if spec_tag.startswith("c_")
+                else "2"
+                if spec_tag.startswith("d_")
+                else "3"
+                if spec_tag.startswith("defects")
+                else "4"
+            )
             spec_el.set("oid", fallback_oid)
             _create_text_element(spec_el, "name", spec_tag)
             ver_el = etree.SubElement(spec_el, f"{{{NS}}}version")
-            major = etree.SubElement(ver_el, f"{{{NS}}}major"); major.text = "1"
-            minor = etree.SubElement(ver_el, f"{{{NS}}}minor"); minor.text = "0"
+            major = etree.SubElement(ver_el, f"{{{NS}}}major")
+            major.text = "1"
+            minor = etree.SubElement(ver_el, f"{{{NS}}}minor")
+            minor.text = "0"
             date_el = etree.SubElement(ver_el, f"{{{NS}}}date")
-            y = etree.SubElement(date_el, f"{{{NS}}}year"); y.text = "2024"
-            m = etree.SubElement(date_el, f"{{{NS}}}month"); m.text = "1"
-            d = etree.SubElement(date_el, f"{{{NS}}}day"); d.text = "1"
+            y = etree.SubElement(date_el, f"{{{NS}}}year")
+            y.text = "2024"
+            m = etree.SubElement(date_el, f"{{{NS}}}month")
+            m.text = "1"
+            d = etree.SubElement(date_el, f"{{{NS}}}day")
+            d.text = "1"
             _create_text_element(spec_el, "comments", "Ninguno")
 
         # Add entities for this spec if document filter not mismatched - for simplicity add all
@@ -127,7 +155,14 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
             if filter_type:
                 types_to_export = [filter_type] if filter_type in types_to_export else []
             for typ in types_to_export:
-                if typ in ["trace", "attribute", "component", "role", "parameter", "traceability_matrix"]:
+                if typ in [
+                    "trace",
+                    "attribute",
+                    "component",
+                    "role",
+                    "parameter",
+                    "traceability_matrix",
+                ]:
                     continue
                 table2 = TYPE_TO_TABLE.get(typ)
                 if not table2:
@@ -151,26 +186,40 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
                     _create_text_element(el, "name", str(r.get("name", "")))
                     # version
                     ver2 = etree.SubElement(el, f"{{{NS}}}version")
-                    ma = etree.SubElement(ver2, f"{{{NS}}}major"); ma.text = str(r.get("versionMajor", 1) or 1)
-                    mi = etree.SubElement(ver2, f"{{{NS}}}minor"); mi.text = str(r.get("versionMinor", 0) or 0)
+                    ma = etree.SubElement(ver2, f"{{{NS}}}major")
+                    ma.text = str(r.get("versionMajor", 1) or 1)
+                    mi = etree.SubElement(ver2, f"{{{NS}}}minor")
+                    mi.text = str(r.get("versionMinor", 0) or 0)
                     da = etree.SubElement(ver2, f"{{{NS}}}date")
-                    ye = etree.SubElement(da, f"{{{NS}}}year"); ye.text = "2024"
-                    mo = etree.SubElement(da, f"{{{NS}}}month"); mo.text = "1"
-                    dy = etree.SubElement(da, f"{{{NS}}}day"); dy.text = "1"
+                    ye = etree.SubElement(da, f"{{{NS}}}year")
+                    ye.text = "2024"
+                    mo = etree.SubElement(da, f"{{{NS}}}month")
+                    mo.text = "1"
+                    dy = etree.SubElement(da, f"{{{NS}}}day")
+                    dy.text = "1"
                     # Add comments if present or default for SpecificationObject
                     if r.get("comments") is not None:
                         _create_text_element(el, "comments", str(r.get("comments")))
                     # Section needs level/number
-                    if typ in ["section","appendix"]:
-                        lvl = etree.SubElement(el, f"{{{NS}}}level"); lvl.text = str(r.get("level", "1") or "1")
-                        num = etree.SubElement(el, f"{{{NS}}}number"); num.text = str(r.get("number", "1") or "1")
+                    if typ in ["section", "appendix"]:
+                        lvl = etree.SubElement(el, f"{{{NS}}}level")
+                        lvl.text = str(r.get("level", "1") or "1")
+                        num = etree.SubElement(el, f"{{{NS}}}number")
+                        num.text = str(r.get("number", "1") or "1")
                     # description if exists
                     if r.get("description"):
                         _create_text_element(el, "description", str(r.get("description")))
                     # For C-requirements need importance etc.
-                    if typ in ["constraint_requirement", "objective"] or typ.endswith("_requirement"):
+                    if typ in ["constraint_requirement", "objective"] or typ.endswith(
+                        "_requirement"
+                    ):
                         # importance, urgency etc. if present
-                        for val_tag, col in [("importance", "importance"), ("urgency", "urgency"), ("status", "status"), ("stability", "stability")]:
+                        for val_tag, col in [
+                            ("importance", "importance"),
+                            ("urgency", "urgency"),
+                            ("status", "status"),
+                            ("stability", "stability"),
+                        ]:
                             if r.get(col) is not None:
                                 imp_el = etree.SubElement(el, f"{{{NS}}}{val_tag}")
                                 imp_el.set("value", f"VAL-{r.get(col)}")
@@ -238,7 +287,17 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
 
     return {"xml": xml_str, "path": tmp, "dtd_errors": dtd_errors, "project_id": project_id}
 
-def import_xml(session_manager, project_id: str, xml: str | None = None, file_path: str | None = None, strategy: str = "merge", dry_run: bool = False, confirm_replace: bool = False, on_missing_ref: str = "error") -> dict[str, Any]:
+
+def import_xml(
+    session_manager,
+    project_id: str,
+    xml: str | None = None,
+    file_path: str | None = None,
+    strategy: str = "merge",
+    dry_run: bool = False,
+    confirm_replace: bool = False,
+    on_missing_ref: str = "error",
+) -> dict[str, Any]:
     if (xml is None and file_path is None) or (xml is not None and file_path is not None):
         raise ValueError("Exactly one of xml or file_path required")
     content = xml
@@ -256,7 +315,9 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
         if Path(dtd_p).exists():
             dtd = etree.DTD(dtd_p)
             if not dtd.validate(doc):
-                dtd_warnings = [f"line {err.line}: {err.message}" for err in dtd.error_log.filter_from_errors()]
+                dtd_warnings = [
+                    f"line {err.line}: {err.message}" for err in dtd.error_log.filter_from_errors()
+                ]
     except Exception as e:
         dtd_warnings.append(str(e))
 
@@ -395,7 +456,7 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
                             row["versionMajor"] = 1
                         if "versionMinor" not in row:
                             row["versionMinor"] = 0
-                        cols = ", ".join(f"[{k}]" for k in row.keys())
+                        cols = ", ".join(f"[{k}]" for k in row)
                         vals = ", ".join(sql_escape(v) for v in row.values())
                         sql = f"INSERT INTO [{table}] ({cols}) VALUES ({vals})"
                         try:
@@ -415,7 +476,9 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
                 if not oid_s or not src or not tgt:
                     continue
                 try:
-                    oid_i = _parse_oid(oid_s); src_i = _parse_oid(src); tgt_i = _parse_oid(tgt)
+                    oid_i = _parse_oid(oid_s)
+                    src_i = _parse_oid(src)
+                    tgt_i = _parse_oid(tgt)
                 except:
                     continue
                 try:
@@ -425,7 +488,10 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
                     exists = False
                 if not exists:
                     try:
-                        execute_sql(db_path, f"INSERT INTO [Trace] ([oid],[source],[target]) VALUES ({oid_i},{src_i},{tgt_i})")
+                        execute_sql(
+                            db_path,
+                            f"INSERT INTO [Trace] ([oid],[source],[target]) VALUES ({oid_i},{src_i},{tgt_i})",
+                        )
                         imported += 1
                     except Exception as e:
                         errors.append({"trace_oid": oid_i, "error": str(e)})
@@ -442,4 +508,10 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
             elems = doc.findall(f".//{{{NS}}}{xml_tag}")
             imported += len(elems)
 
-    return {"imported": imported, "updated": updated, "errors": errors, "project_id": project_id, "dry_run": dry_run}
+    return {
+        "imported": imported,
+        "updated": updated,
+        "errors": errors,
+        "project_id": project_id,
+        "dry_run": dry_run,
+    }

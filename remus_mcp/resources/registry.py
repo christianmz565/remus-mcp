@@ -1,7 +1,7 @@
 """Resources registry."""
+
 from __future__ import annotations
 
-from typing import Any
 
 def register_resources(server, session_manager):
     # We'll register via MCP SDK handlers; this module provides helper functions
@@ -9,9 +9,12 @@ def register_resources(server, session_manager):
     def list_resources_impl():
         resources = []
         for pid in session_manager.projects.keys():
-            resources.append({"uri": f"rem://{pid}/projects", "name": "Projects", "mimeType": "application/json"})
+            resources.append(
+                {"uri": f"rem://{pid}/projects", "name": "Projects", "mimeType": "application/json"}
+            )
             resources.append({"uri": f"rem://{pid}/documents", "name": "Documents"})
             from ..jet.schema import REM_TYPE_VALUES
+
             for t in REM_TYPE_VALUES:
                 resources.append({"uri": f"rem://{pid}/{t}", "name": f"{t} list"})
                 # not enumerating per-oid here
@@ -23,28 +26,41 @@ def register_resources(server, session_manager):
         # Format: rem://<pid>/<type> or rem://<pid>/<type>/<oid> or rem://<pid>/trace-matrix/...
         if not uri.startswith("rem://"):
             raise ValueError("Invalid URI")
-        rest = uri[len("rem://"):]
+        rest = uri[len("rem://") :]
         parts = rest.split("/")
         if len(parts) < 2:
             raise ValueError("Invalid resource URI")
         pid = parts[0]
         tail = parts[1:]
         import json
-        from ..tools.crud import rem_list, rem_get
+
+        from ..jet.mdbtools import export_table
+        from ..tools.crud import rem_get, rem_list
         from ..tools.traces import trace_matrix
         from ..tools.xml_ops import export_xml
-        from ..jet.mdbtools import export_table
 
         if tail[0] == "projects":
             return json.dumps(session_manager.list_projects(), indent=2)
         elif tail[0] == "documents":
             # list spec docs
             docs = []
-            for tbl in ["C_RequirementsSpecification", "D_RequirementsSpecification", "DefectsSpecification", "ChangeRequestsSpecification"]:
+            for tbl in [
+                "C_RequirementsSpecification",
+                "D_RequirementsSpecification",
+                "DefectsSpecification",
+                "ChangeRequestsSpecification",
+            ]:
                 try:
                     rows = export_table(str(session_manager.get(pid).db_path), tbl)
                     for r in rows:
-                        docs.append({"type": tbl, "oid": r.get("oid"), "name": r.get("name"), "version": f"{r.get('versionMajor')}.{r.get('versionMinor')}"})
+                        docs.append(
+                            {
+                                "type": tbl,
+                                "oid": r.get("oid"),
+                                "name": r.get("name"),
+                                "version": f"{r.get('versionMajor')}.{r.get('versionMinor')}",
+                            }
+                        )
                 except Exception:
                     pass
             return json.dumps(docs, indent=2)

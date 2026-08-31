@@ -1,7 +1,11 @@
-import shutil, pathlib, pytest
+import shutil
+
+import pytest
+from conftest import find_base
+
 from remus_mcp.session import SessionManager
 from remus_mcp.tools import crud, traces
-from conftest import find_base
+
 
 @pytest.fixture
 def project(tmp_path):
@@ -12,10 +16,35 @@ def project(tmp_path):
     pid = sm.open_project(str(dst))
     return sm, pid
 
+
 def test_trace_add_remove_matrix(project):
     sm, pid = project
-    o1 = crud.rem_create(sm, pid, "objective", {"name":"O1","description":"o1","importance":1,"urgency":1,"status":1,"stability":1})
-    o2 = crud.rem_create(sm, pid, "objective", {"name":"O2","description":"o2","importance":1,"urgency":1,"status":1,"stability":1})
+    o1 = crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "O1",
+            "description": "o1",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
+    o2 = crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "O2",
+            "description": "o2",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
     # Add trace
     tr = traces.trace_add(sm, pid, o1["oid"], o2["oid"])
     assert "trace_oid" in tr
@@ -28,9 +57,22 @@ def test_trace_add_remove_matrix(project):
     mat2 = traces.trace_matrix(sm, pid, "objective", "objective")
     assert mat2["matrix"][0][1] is False
 
+
 def test_validate_project(project):
     sm, pid = project
-    crud.rem_create(sm, pid, "objective", {"name":"O1","description":"o1","importance":1,"urgency":1,"status":1,"stability":1})
+    crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "O1",
+            "description": "o1",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
     res = traces.validate_project(sm, pid)
     assert "errors" in res and "stats" in res
     assert res["stats"]["objective"] == 1

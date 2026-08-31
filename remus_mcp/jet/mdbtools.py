@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import shutil
 import subprocess
-import re
 from pathlib import Path
 from typing import Any
+
 
 class JetWriteNotSupported(RuntimeError):
     pass
 
+
 def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
 
 def sql_escape(val: Any) -> str:
     if val is None:
@@ -25,6 +28,7 @@ def sql_escape(val: Any) -> str:
         return str(val)
     s = str(val).replace("'", "''")
     return f"'{s}'"
+
 
 def list_tables(db_path: str) -> list[str]:
     p = Path(db_path)
@@ -37,11 +41,13 @@ def list_tables(db_path: str) -> list[str]:
     tables = [line.strip() for line in r.stdout.splitlines() if line.strip()]
     return tables
 
+
 def get_schema(db_path: str) -> str:
     r = _run(["mdb-schema", db_path])
     if r.returncode != 0:
         raise RuntimeError(f"mdb-schema failed: {r.stderr.strip()}")
     return r.stdout
+
 
 def export_table(db_path: str, table: str, fmt: str = "json") -> list[dict[str, Any]]:
     p = Path(db_path)
@@ -105,19 +111,24 @@ def export_table(db_path: str, table: str, fmt: str = "json") -> list[dict[str, 
         out.append(clean)
     return out
 
+
 def query_sql(db_path: str, sql: str) -> list[dict[str, Any]]:
     """Query SQL is not supported directly; use export_table filter."""
     raise JetWriteNotSupported("query_sql not supported; use export_table filter")
+
 
 def execute_sql(db_path: str, sql: str) -> None:
     """Execute SQL directly via Jackcess engine."""
     try:
         from .jackcess import execute_sql_via_jackcess
+
         execute_sql_via_jackcess(db_path, sql)
     except ImportError as e:
         raise JetWriteNotSupported(f"Jackcess engine not available: {e}") from e
     except Exception as e:
         raise RuntimeError(f"Jackcess execute failed for sql={sql[:300]}: {e}") from e
+
+
 def max_oid(db_path: str, table: str) -> int:
     rows = export_table(db_path, table)
     maxv = 0
@@ -125,8 +136,7 @@ def max_oid(db_path: str, table: str) -> int:
         oid = r.get("oid") or r.get("OID") or 0
         try:
             oid_i = int(oid) if oid is not None else 0
-            if oid_i > maxv:
-                maxv = oid_i
+            maxv = max(maxv, oid_i)
         except Exception:
             pass
     return maxv

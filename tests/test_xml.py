@@ -1,7 +1,11 @@
-import shutil, pathlib, pytest
-from remus_mcp.session import SessionManager
-from remus_mcp.tools import xml_ops, crud
+import pathlib
+import shutil
+
 from conftest import find_base, find_doc
+
+from remus_mcp.session import SessionManager
+from remus_mcp.tools import crud, xml_ops
+
 
 def _make_doc_project(tmp_path, name="src.rem"):
     # Use real doc if vendored fixture exists, else synthesize small project
@@ -19,9 +23,22 @@ def _make_doc_project(tmp_path, name="src.rem"):
     sm = SessionManager()
     pid = sm.open_project(str(dst))
     # create a few objects so export has content
-    crud.rem_create(sm, pid, "objective", {"name":"Synthetic OBJ","description":"for xml roundtrip","importance":1,"urgency":1,"status":1,"stability":1})
-    crud.rem_create(sm, pid, "actor", {"name":"Synthetic Actor","description":"actor for xml"})
+    crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "Synthetic OBJ",
+            "description": "for xml roundtrip",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
+    crud.rem_create(sm, pid, "actor", {"name": "Synthetic Actor", "description": "actor for xml"})
     return sm, pid, str(dst)
+
 
 def test_xml_roundtrip(tmp_path):
     sm, pid, _ = _make_doc_project(tmp_path, "src.rem")
@@ -43,7 +60,9 @@ def test_xml_roundtrip(tmp_path):
     assert len(imp["errors"]) == 0
     # Verify counts match for some types
     from remus_mcp.jet.mdbtools import export_table
-    assert len(export_table(str(dst2),"Objective")) > 0
+
+    assert len(export_table(str(dst2), "Objective")) > 0
+
 
 def test_xml_dry_run_empty(tmp_path):
     src = find_base("english")

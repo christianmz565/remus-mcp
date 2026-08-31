@@ -1,22 +1,37 @@
 """Typed CRUD quartet."""
+
 from __future__ import annotations
 
 from typing import Any
 
 from ..config import DEFAULT_LIMIT, MAX_LIMIT
-from ..jet.mdbtools import export_table, execute_sql, max_oid, sql_escape, JetWriteNotSupported
-from ..jet.schema import TYPE_TO_TABLE, TABLE_TO_TYPE, REQUIRED_FIELDS
+from ..jet.mdbtools import JetWriteNotSupported, execute_sql, export_table, max_oid, sql_escape
+from ..jet.schema import TYPE_TO_TABLE
 from ..validation import validate_create, validate_update
+
 
 def _ensure_type(type_name: str):
     if type_name not in TYPE_TO_TABLE:
         raise ValueError(f"INVALID_TYPE: {type_name}")
 
+
 def _table_for(type_name: str) -> str:
     _ensure_type(type_name)
     return TYPE_TO_TABLE[type_name]
 
-def rem_list(session_manager, project_id: str, type: str, document: int | None = None, parent: int | None = None, search: str | None = None, filters: dict | None = None, limit: int = DEFAULT_LIMIT, offset: int = 0, order_by: str = "order") -> dict[str, Any]:
+
+def rem_list(
+    session_manager,
+    project_id: str,
+    type: str,
+    document: int | None = None,
+    parent: int | None = None,
+    search: str | None = None,
+    filters: dict | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
+    order_by: str = "order",
+) -> dict[str, Any]:
     if limit > MAX_LIMIT:
         raise ValueError(f"LIMIT_TOO_LARGE: limit capped at {MAX_LIMIT}")
     table = _table_for(type)
@@ -26,20 +41,28 @@ def rem_list(session_manager, project_id: str, type: str, document: int | None =
     # Filters
     filtered = rows
     if document is not None:
-        filtered = [r for r in filtered if r.get("document") is not None and int(r["document"]) == int(document)]
+        filtered = [
+            r
+            for r in filtered
+            if r.get("document") is not None and int(r["document"]) == int(document)
+        ]
     if parent is not None:
-        filtered = [r for r in filtered if r.get("parent") is not None and int(r["parent"]) == int(parent)]
+        filtered = [
+            r for r in filtered if r.get("parent") is not None and int(r["parent"]) == int(parent)
+        ]
     if filters:
         for k, v in filters.items():
             filtered = [r for r in filtered if str(r.get(k, "")) == str(v) or r.get(k) == v]
     if search:
         s = search.lower()
+
         def matches(r):
             for f in ["name", "description", "comments"]:
                 val = r.get(f)
                 if val and s in str(val).lower():
                     return True
             return False
+
         filtered = [r for r in filtered if matches(r)]
     # Order
     if order_by:
@@ -48,8 +71,9 @@ def rem_list(session_manager, project_id: str, type: str, document: int | None =
         if filtered:
             filtered = sorted(filtered, key=lambda r: (r.get(order_by) is None, r.get(order_by)))
     total_filtered = len(filtered)
-    paged = filtered[offset: offset + limit]
+    paged = filtered[offset : offset + limit]
     return {"items": paged, "total": total_filtered, "project_id": project_id, "type": type}
+
 
 def rem_get(session_manager, project_id: str, type: str, oid: int) -> dict[str, Any]:
     table = _table_for(type)
@@ -60,14 +84,17 @@ def rem_get(session_manager, project_id: str, type: str, oid: int) -> dict[str, 
             return {"item": r, "project_id": project_id, "type": type}
     raise KeyError(f"NOT_FOUND: {type} oid {oid}")
 
+
 def _build_insert_sql(table: str, row: dict[str, Any]) -> str:
-    cols = ", ".join(f"[{k}]" for k in row.keys())
+    cols = ", ".join(f"[{k}]" for k in row)
     vals = ", ".join(sql_escape(v) for v in row.values())
     return f"INSERT INTO [{table}] ({cols}) VALUES ({vals})"
+
 
 def _build_update_sql(table: str, oid: int, patch: dict[str, Any]) -> str:
     sets = ", ".join(f"[{k}]={sql_escape(v)}" for k, v in patch.items())
     return f"UPDATE [{table}] SET {sets} WHERE [oid]={int(oid)}"
+
 
 def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]) -> dict[str, Any]:
     table = _table_for(type)
@@ -92,6 +119,7 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
             row["versionMinor"] = 0
         if "versionDate" not in row or row["versionDate"] is None:
             import datetime
+
             row["versionDate"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # Auto order
         if "order" not in row or row["order"] is None:
@@ -108,8 +136,7 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
                             continue
                     try:
                         o = int(r.get("order") or 0)
-                        if o > max_order:
-                            max_order = o
+                        max_order = max(max_order, o)
                     except:
                         pass
                 row["order"] = max_order + 1
@@ -132,7 +159,10 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
                 return {"oid": new_oid, "item": r, "project_id": project_id, "type": type}
         return {"oid": new_oid, "item": row, "project_id": project_id, "type": type}
 
-def rem_update(session_manager, project_id: str, type: str, oid: int, patch: dict[str, Any]) -> dict[str, Any]:
+
+def rem_update(
+    session_manager, project_id: str, type: str, oid: int, patch: dict[str, Any]
+) -> dict[str, Any]:
     table = _table_for(type)
     session = session_manager.get(project_id)
     errors = validate_update(type, patch, str(session.db_path))
@@ -150,6 +180,7 @@ def rem_update(session_manager, project_id: str, type: str, oid: int, patch: dic
     with session_manager.mutate(project_id, "rem_update", type, oid):
         # Bump versionMinor + date
         import datetime
+
         patch2 = dict(patch)
         # If versionMinor exists, bump
         try:
@@ -173,7 +204,10 @@ def rem_update(session_manager, project_id: str, type: str, oid: int, patch: dic
                 return {"item": r, "project_id": project_id, "type": type}
         return {"item": {**existing, **patch2}, "project_id": project_id, "type": type}
 
-def rem_delete(session_manager, project_id: str, type: str, oid: int, cascade: bool = False) -> dict[str, Any]:
+
+def rem_delete(
+    session_manager, project_id: str, type: str, oid: int, cascade: bool = False
+) -> dict[str, Any]:
     table = _table_for(type)
     session = session_manager.get(project_id)
     rows = export_table(str(session.db_path), table)
@@ -185,7 +219,9 @@ def rem_delete(session_manager, project_id: str, type: str, oid: int, cascade: b
     try:
         traces = export_table(str(session.db_path), "Trace")
         for t in traces:
-            if int(t.get("source", -1) or -1) == int(oid) or int(t.get("target", -1) or -1) == int(oid):
+            if int(t.get("source", -1) or -1) == int(oid) or int(t.get("target", -1) or -1) == int(
+                oid
+            ):
                 refs.append({"table": "Trace", "oid": t.get("oid")})
     except Exception:
         pass
@@ -195,7 +231,15 @@ def rem_delete(session_manager, project_id: str, type: str, oid: int, cascade: b
             jrows = export_table(str(session.db_path), jtbl)
             for jr in jrows:
                 # Step.owner maybe?
-                for k in ["specificationObject", "owner", "source", "target", "object", "Author", "Specification"]:
+                for k in [
+                    "specificationObject",
+                    "owner",
+                    "source",
+                    "target",
+                    "object",
+                    "Author",
+                    "Specification",
+                ]:
                     if k in jr and jr[k] is not None and int(jr[k]) == int(oid):
                         refs.append({"table": jtbl, "oid": jr.get("oid")})
                 # Generic check any int column equals oid
@@ -217,7 +261,10 @@ def rem_delete(session_manager, project_id: str, type: str, oid: int, cascade: b
             for ref in refs:
                 if ref["table"] == "Trace":
                     try:
-                        execute_sql(str(session.db_path), f"DELETE FROM [Trace] WHERE [oid]={int(ref['oid'])}")
+                        execute_sql(
+                            str(session.db_path),
+                            f"DELETE FROM [Trace] WHERE [oid]={int(ref['oid'])}",
+                        )
                     except Exception:
                         pass
         sql = f"DELETE FROM [{table}] WHERE [oid]={int(oid)}"
@@ -228,4 +275,10 @@ def rem_delete(session_manager, project_id: str, type: str, oid: int, cascade: b
         except Exception as e:
             raise RuntimeError(f"DELETE failed: {e}")
         session_manager.append_change(project_id, "rem_delete", oid, type)
-        return {"deleted": 1, "project_id": project_id, "type": type, "oid": oid, "cascade_deleted": len(refs) if cascade else 0}
+        return {
+            "deleted": 1,
+            "project_id": project_id,
+            "type": type,
+            "oid": oid,
+            "cascade_deleted": len(refs) if cascade else 0,
+        }

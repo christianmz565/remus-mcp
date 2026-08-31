@@ -1,7 +1,11 @@
-import shutil, pathlib, tempfile, pytest
+import shutil
+
+import pytest
+from conftest import find_base
+
 from remus_mcp.session import SessionManager
 from remus_mcp.tools import crud
-from conftest import find_base
+
 
 @pytest.fixture
 def empty_project(tmp_path):
@@ -12,13 +16,26 @@ def empty_project(tmp_path):
     pid = sm.open_project(str(dst))
     return sm, pid, str(dst)
 
+
 def test_create_objective(empty_project):
     sm, pid, db_path = empty_project
     # Initially empty
     res = crud.rem_list(sm, pid, "objective", limit=10)
     assert res["total"] == 0
     # Create
-    created = crud.rem_create(sm, pid, "objective", {"name":"OBJ-1","description":"Test","importance":1,"urgency":1,"status":1,"stability":1})
+    created = crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "OBJ-1",
+            "description": "Test",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
     assert "oid" in created
     oid = created["oid"]
     # Read back
@@ -28,7 +45,7 @@ def test_create_objective(empty_project):
     res2 = crud.rem_list(sm, pid, "objective", limit=10)
     assert res2["total"] == 1
     # Update
-    upd = crud.rem_update(sm, pid, "objective", oid, {"name":"OBJ-1 updated"})
+    upd = crud.rem_update(sm, pid, "objective", oid, {"name": "OBJ-1 updated"})
     assert upd["item"]["name"] == "OBJ-1 updated"
     # Undo
     sm.undo_last(pid)
@@ -38,11 +55,37 @@ def test_create_objective(empty_project):
     # Due to backup restore, version may revert
     assert got2["item"]["oid"] == oid
 
+
 def test_delete_cascade(empty_project):
     sm, pid, db_path = empty_project
-    a = crud.rem_create(sm, pid, "objective", {"name":"A","description":"a","importance":1,"urgency":1,"status":1,"stability":1})
-    b = crud.rem_create(sm, pid, "objective", {"name":"B","description":"b","importance":1,"urgency":1,"status":1,"stability":1})
+    a = crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "A",
+            "description": "a",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
+    b = crud.rem_create(
+        sm,
+        pid,
+        "objective",
+        {
+            "name": "B",
+            "description": "b",
+            "importance": 1,
+            "urgency": 1,
+            "status": 1,
+            "stability": 1,
+        },
+    )
     from remus_mcp.tools import traces
+
     traces.trace_add(sm, pid, a["oid"], b["oid"])
     # Delete without cascade should fail
     with pytest.raises(Exception, match="REFERENTIAL_INTEGRITY"):

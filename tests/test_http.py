@@ -1,6 +1,6 @@
 """Tests for MCP HTTP transport (Streamable HTTP / SSE)."""
+
 from starlette.testclient import TestClient
-import json
 
 from remus_mcp.server import create_server
 from remus_mcp.session import SessionManager

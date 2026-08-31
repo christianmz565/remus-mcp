@@ -1,4 +1,4 @@
-from .enums import RemType
 from .entities import RemEntity, TraceEntity
+from .enums import RemType
 
-__all__ = ["RemType", "RemEntity", "TraceEntity"]
+__all__ = ["RemEntity", "RemType", "TraceEntity"]
