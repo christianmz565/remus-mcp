@@ -8,11 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mdbtools \
     default-jre-headless \
     wine64 \
-    winetricks \
     xvfb \
     curl \
     ca-certificates \
     wkhtmltopdf \
+    cabextract \
+    unzip \
+    p7zip-full \
+  && curl -fsSL -o /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+  && chmod +x /usr/local/bin/winetricks \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
