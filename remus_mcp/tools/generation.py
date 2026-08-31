@@ -78,7 +78,7 @@ def _init_lxml_namespaces():
         if inline:
             return val.replace("\n", "<br/>")
         paragraphs = val.split("\n\n")
-        return "".join(f"<p>{p.replace('\n', '<br/>')}</p>" for p in paragraphs if p.strip())
+        return "".join(f"<p>{p.replace(chr(10), '<br/>')}</p>" for p in paragraphs if p.strip())
 
     rem_ns["bool2space"] = _bool2space
     rem_ns["toLowerCase"] = lambda context, s: "".join(str(x) for x in s).lower() if isinstance(s, list) else str(s or "").lower()

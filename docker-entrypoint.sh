@@ -1,5 +1,12 @@
 #!/bin/bash
 set -e
+
+# Ensure WINEPREFIX points to a directory owned by the current running user
+if [ -z "$WINEPREFIX" ] || [ ! -d "$WINEPREFIX" ] || [ "$(stat -c '%u' "$WINEPREFIX" 2>/dev/null)" != "$(id -u)" ]; then
+  export WINEPREFIX="/tmp/wine-$(id -u)"
+fi
+mkdir -p "$WINEPREFIX"
+
 # Lazy Wine prefix init for msxml3 (used by render_html). No network at build time
 # is okay — fallback to lxml is supported and warning is returned to MCP client.
 if [ ! -f "$WINEPREFIX/drive_c/windows/system32/msxml3.dll" ]; then

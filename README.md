@@ -18,7 +18,8 @@ curl -H "Authorization: Bearer secret" http://127.0.0.1:3000/health
 - `Dockerfile` at repo root (and `mcp/Dockerfile` — same content, repo-root context):
   `python:3.11-slim-bookworm` + `mdbtools + default-jre-headless + wine64 + winetricks + xvfb + wkhtmltopdf` + `uv`.
   Bakes `mcp/`, `xml/remus.dtd`, `xslt/`, `base/*.rem`, `jars/`, `assets/transform.vbs`.
-  Wine prefix at `/opt/wine` (`WINEARCH=win32`) lazy-initializes at first container start (`docker-entrypoint.sh` → `xvfb-run wineboot` + `winetricks -q msxml3`, falls back to lxml if offline).
+  Wine prefix at `/opt/wine` (`WINEARCH=win32`) lazy-initializes at container start (`docker-entrypoint.sh` → `xvfb-run wineboot` + `winetricks -q msxml3`, falls back to lxml if offline).
+  Containers run as the host user (`user: "${UID:-1000}:${GID:-1000}"` in compose) so files written to `/data` remain owned by the user, enabling direct editing with the original desktop app.
 
 - `docker-compose.yml` (repo root) — two services, one image, different transports:
 
@@ -27,7 +28,6 @@ curl -H "Authorization: Bearer secret" http://127.0.0.1:3000/health
   | `remus-mcp-stdio` | **stdio** (local) | `docker compose run --rm remus-mcp-stdio` (attaches stdin) | — | no auth |
   | `remus-mcp-http` | **Streamable HTTP** (remote, SSE fallback via SDK) | `docker compose up remus-mcp-http` | `3000:3000` (`${REMUS_HTTP_PORT:-3000}`) | `Bearer ${MCP_AUTH_TOKEN:-secret}` |
   | `remus-mcp-sse` | alias to http | `docker compose --profile sse up remus-mcp-sse` | 3000 | same |
-
 ```sh
 # Build & run HTTP (recommended for Inspector / remote agents)
 docker compose up --build remus-mcp-http
@@ -40,7 +40,7 @@ mkdir -p data && cp base/remus_base_empty_english.rem data/project.rem
 docker compose run --rm remus-mcp-stdio
 # or manual:
 docker build -t remus-mcp .                         # from repo root
-docker run --rm -i -v ./data:/data remus-mcp uv run remus-mcp --rem /data/project.rem
+docker run --rm -i --user $(id -u):$(id -g) -v ./data:/data remus-mcp uv run remus-mcp --rem /data/project.rem
 # or from mcp/  (repo-root context required):
 docker build -f mcp/Dockerfile -t remus-mcp .
 ```
@@ -51,9 +51,8 @@ Data mounts: `./data:/data` (your `.rem` files), `./base:/app/base:ro` etc. are 
 
 stdio via docker:
 ```json
-{"mcpServers":{"remus":{"command":"docker","args":["run","--rm","-i","-v","/abs/path/to/data:/data","remus-mcp","uv","run","remus-mcp","--rem","/data/project.rem"]}}}
+{"mcpServers":{"remus":{"command":"docker","args":["run","--rm","-i","--user","1000:1000","-v","/abs/path/to/data:/data","remus-mcp","uv","run","remus-mcp","--rem","/data/project.rem"]}}}
 ```
-
 HTTP (remote):
 ```json
 {"mcpServers":{"remus-http":{"url":"http://127.0.0.1:3000/mcp","headers":{"Authorization":"Bearer secret"}}}}

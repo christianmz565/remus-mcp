@@ -47,9 +47,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 RUN useradd -m -u 1000 remus && \
     mkdir -p /data /opt/wine /app/mcp && \
-    chown -R remus:remus /data /opt/wine /app/mcp
+    chown -R remus:remus /data /opt/wine /app/mcp && \
+    chmod 777 /data /opt/wine
 RUN su remus -s /bin/sh -c "WINEPREFIX=/opt/wine WINEARCH=win32 xvfb-run -a wineboot --init" || true && \
-    chown -R remus:remus /opt/wine
+    chown -R remus:remus /opt/wine && \
+    chmod -R 777 /opt/wine
 
 COPY --from=builder --chown=remus:remus /app/mcp /app/mcp
 

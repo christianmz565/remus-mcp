@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: remus-mcp:latest
+    user: "${UID:-1000}:${GID:-1000}"
     stdin_open: true
     tty: true
     volumes:
@@ -24,6 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: remus-mcp:latest
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "${REMUS_HTTP_PORT:-3000}:3000"
     volumes:
