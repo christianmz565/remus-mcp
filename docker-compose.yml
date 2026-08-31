@@ -1,0 +1,48 @@
+# REMUS MCP — standalone compose (context = mcp/)
+# This file assumes mcp/ is the repo root (vendored xml/xslt/base inside).
+# Usage: docker compose up --build
+services:
+  remus-mcp-stdio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: remus-mcp:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/data
+    environment:
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+      WINEPREFIX: /opt/wine
+      WINEARCH: win32
+      JAVA_HOME: /usr/lib/jvm/default-java
+    command: ["uv", "run", "remus-mcp", "--rem", "/data/project.rem"]
+    restart: "no"
+
+  remus-mcp-http:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: remus-mcp:latest
+    ports:
+      - "${REMUS_HTTP_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-secret}
+      WINEPREFIX: /opt/wine
+      WINEARCH: win32
+      JAVA_HOME: /usr/lib/jvm/default-java
+    command: ["uv", "run", "remus-mcp", "--http", "--host", "0.0.0.0", "--port", "3000"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  remus-mcp-sse:
+    extends:
+      service: remus-mcp-http
+    profiles: ["sse"]

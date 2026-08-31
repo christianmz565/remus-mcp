@@ -1,0 +1,41 @@
+[project]
+name = "remus-mcp"
+version = "0.1.0"
+description = "REMUS Fully-Featured MCP for AI Agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.8,<2",
+  "pydantic>=2",
+  "lxml>=5",
+  "typer>=0.12",
+  "uvicorn>=0.30",
+  "starlette>=0.38",
+  "anyio>=4",
+  "jpype1>=1.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio",
+  "httpx",
+]
+
+[project.scripts]
+remus-mcp = "remus_mcp.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
