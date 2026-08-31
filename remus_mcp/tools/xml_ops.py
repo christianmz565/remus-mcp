@@ -8,6 +8,7 @@ from typing import Any
 
 from lxml import etree
 
+from ..config import get_dtd_path
 from ..jet.mdbtools import export_table, execute_sql, max_oid, sql_escape
 from ..jet.schema import TYPE_TO_TABLE
 
@@ -49,22 +50,7 @@ TYPE_TO_XMLTAG = {
 XMLTAG_TO_TYPE = {v: k for k, v in TYPE_TO_XMLTAG.items()}
 
 def _dtd_path() -> str:
-    env = os.getenv("REMUS_DTD_PATH")
-    if env and Path(env).exists():
-        return env
-    candidates = [
-        Path(__file__).parents[3] / "xml" / "remus.dtd",  # monorepo: /app/xml
-        Path(__file__).parents[2] / "xml" / "remus.dtd",  # standalone: mcp/xml
-        Path(__file__).parents[2] / ".." / "xml" / "remus.dtd",
-        Path("/app/xml/remus.dtd"),  # Docker WORKDIR /app/mcp
-        Path("/home/cricro/tiny-projects/remus/xml/remus.dtd"),
-        Path("xml/remus.dtd"),  # cwd/xml or mcp/xml
-        Path("mcp/xml/remus.dtd"),
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    return "xml/remus.dtd"
+    return str(get_dtd_path())
 
 def _create_text_element(parent, tag: str, text: str | None):
     if text is None:
@@ -73,24 +59,13 @@ def _create_text_element(parent, tag: str, text: str | None):
     # Handle REM_TEXT with possible refs? Simplified as plain text
     el.text = str(text)
 
-def _parse_oid(oid_s: str) -> int:
-    # Handle prefixed like OBJ-0001, CRS-0001, numeric "1"
+def _parse_oid(oid_s: Any) -> int:
     if oid_s is None:
-        raise ValueError("oid None")
-    s = oid_s.strip()
-    # If contains '-', take last part
-    if "-" in s:
-        s = s.split("-")[-1]
-    # Remove leading zeros
+        raise ValueError("INVALID_OID: None")
     try:
-        return int(s)
-    except:
-        # Try to extract digits
-        import re
-        m = re.search(r"\d+", s)
-        if m:
-            return int(m.group(0))
-        raise
+        return int(str(oid_s).strip())
+    except Exception as e:
+        raise ValueError(f"INVALID_OID: {oid_s}") from e
 
 def export_xml(session_manager, project_id: str, document: str | None = None, filter_type: str | None = None, filter_ids: list[int] | None = None) -> dict[str, Any]:
     session = session_manager.get(project_id)
@@ -116,7 +91,7 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
         if rows:
             first = rows[0]
             oid_val = first.get("oid", 1)
-            spec_el.set("oid", f"CRS-{int(oid_val):04d}" if spec_tag.startswith("c_") else f"DRS-{int(oid_val):04d}" if spec_tag.startswith("d_") else f"SPC-{int(oid_val):04d}")
+            spec_el.set("oid", str(oid_val))
             _create_text_element(spec_el, "name", str(first.get("name", spec_tag)))
             # version
             ver_el = etree.SubElement(spec_el, f"{{{NS}}}version")
@@ -131,7 +106,7 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
             _create_text_element(spec_el, "comments", str(first.get("comments", "Ninguno") or "Ninguno"))
         else:
             # Generate valid ID
-            fallback_oid = "CRS-0001" if spec_tag.startswith("c_") else "DRS-0002" if spec_tag.startswith("d_") else "DFS-0003" if spec_tag.startswith("defects") else "CHS-0004"
+            fallback_oid = "1" if spec_tag.startswith("c_") else "2" if spec_tag.startswith("d_") else "3" if spec_tag.startswith("defects") else "4"
             spec_el.set("oid", fallback_oid)
             _create_text_element(spec_el, "name", spec_tag)
             ver_el = etree.SubElement(spec_el, f"{{{NS}}}version")
@@ -172,11 +147,7 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
                         oid_int = int(oid_raw) if oid_raw is not None else 0
                     except:
                         oid_int = 0
-                    # Prefix map for valid ID
-                    prefix_map = {"objective":"OBJ","information_requirement":"IR","constraint_requirement":"CR","functional_requirement":"FR","non_functional_requirement":"NFR","use_case":"UC","actor":"ACT","section":"SEC","paragraph":"PAR","organization":"ORG","stakeholder":"STK","meeting":"MTG","object_type":"OT","association_type":"AT","system_operation":"SOP","defect":"DEF","conflict":"CON","change_request":"CHR","glossary_item":"GLO","graphic_file":"GRF","attribute":"ATT","component":"CMP"}
-                    prefix = prefix_map.get(typ, typ[:3].upper())
-                    el.set("oid", f"{prefix}-{oid_int:04d}")
-                    # name
+                    el.set("oid", str(oid_int))
                     _create_text_element(el, "name", str(r.get("name", "")))
                     # version
                     ver2 = etree.SubElement(el, f"{{{NS}}}version")
@@ -218,7 +189,7 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
             except:
                 oid_int = 0
             tr_el = etree.SubElement(root, f"{{{NS}}}trace")
-            tr_el.set("oid", f"TR-{oid_int:04d}")
+            tr_el.set("oid", str(oid_int))
             # isChecked
             if t.get("isChecked") or t.get("checked"):
                 etree.SubElement(tr_el, f"{{{NS}}}isChecked")
@@ -228,14 +199,14 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
                 src_int = int(src_raw) if src_raw is not None else 0
             except:
                 src_int = 0
-            src_el.set("oid", f"OBJ-{src_int:04d}" if src_int else "OBJ-0000")
+            src_el.set("oid", str(src_int))
             tgt_el = etree.SubElement(tr_el, f"{{{NS}}}target")
             tgt_raw = t.get("target")
             try:
                 tgt_int = int(tgt_raw) if tgt_raw is not None else 0
             except:
                 tgt_int = 0
-            tgt_el.set("oid", f"OBJ-{tgt_int:04d}" if tgt_int else "OBJ-0000")
+            tgt_el.set("oid", str(tgt_int))
     except Exception:
         pass
 
@@ -244,8 +215,8 @@ def export_xml(session_manager, project_id: str, document: str | None = None, fi
     pv_el = etree.SubElement(root, f"{{{NS}}}predefinedValues")
 
     # Serialize
-    xml_bytes = etree.tostring(root, pretty_print=True, xml_declaration=True, encoding="iso-8859-1")
-    xml_str = xml_bytes.decode("iso-8859-1")
+    xml_bytes = etree.tostring(root, pretty_print=True, xml_declaration=True, encoding="utf-8")
+    xml_str = xml_bytes.decode("utf-8")
 
     # Validate against DTD if available
     dtd_errors = []
@@ -272,18 +243,12 @@ def import_xml(session_manager, project_id: str, xml: str | None = None, file_pa
         raise ValueError("Exactly one of xml or file_path required")
     content = xml
     if file_path:
-        content = Path(file_path).read_text(encoding="iso-8859-1", errors="ignore")
+        content = Path(file_path).read_text(encoding="utf-8")
     assert content is not None
-    # Try parse with iso-8859-1 bytes
     try:
-        # Use encoding iso-8859-1 for DTD validation compatibility
-        doc = etree.fromstring(content.encode("iso-8859-1"))
+        doc = etree.fromstring(content.encode("utf-8") if isinstance(content, str) else content)
     except Exception as e:
-        # Try utf-8
-        try:
-            doc = etree.fromstring(content.encode("utf-8"))
-        except Exception as e2:
-            raise ValueError(f"DTD parse error: {e2} / {e}")
+        raise ValueError(f"XML parse error: {e}") from e
     # DTD validation (non-fatal: collect warnings)
     dtd_warnings = []
     try:

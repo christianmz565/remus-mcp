@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 import typer
 
+from .config import DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, ENV_AUTH_TOKEN, ENV_WINEPREFIX
 from .session import SessionManager
-from .server import create_server
 
 app = typer.Typer(add_completion=False)
 
@@ -15,10 +15,10 @@ app = typer.Typer(add_completion=False)
 def main(
     rem: str = typer.Option(None, "--rem", help="Default .rem to open on startup"),
     http: bool = typer.Option(False, "--http", help="Start Streamable HTTP server instead of stdio"),
-    port: int = typer.Option(3000, "--port", help="HTTP port"),
-    host: str = typer.Option("127.0.0.1", "--host", help="HTTP host"),
-    auth_token: str = typer.Option(None, "--auth-token", envvar="MCP_AUTH_TOKEN", help="Bearer token for HTTP"),
-    wine_prefix: str = typer.Option(None, "--wine-prefix", envvar="WINEPREFIX", help="Wine prefix"),
+    port: int = typer.Option(DEFAULT_HTTP_PORT, "--port", help="HTTP port"),
+    host: str = typer.Option(DEFAULT_HTTP_HOST, "--host", help="HTTP host"),
+    auth_token: str = typer.Option(None, "--auth-token", envvar=ENV_AUTH_TOKEN, help="Bearer token for HTTP"),
+    wine_prefix: str = typer.Option(None, "--wine-prefix", envvar=ENV_WINEPREFIX, help="Wine prefix"),
 ):
     if wine_prefix:
         os.environ["WINEPREFIX"] = wine_prefix

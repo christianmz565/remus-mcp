@@ -8,6 +8,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from ..config import (
+    ENV_WINEPREFIX,
+    MCP_RESPONSE_MAX_HTML,
+    SUBPROCESS_TIMEOUT_SECONDS,
+    get_xsl_path,
+)
 _lxml_ns_initialized = False
 
 def _init_lxml_namespaces():
@@ -86,8 +92,17 @@ def _init_lxml_namespaces():
 
 _init_lxml_namespaces()
 
-def render_html(session_manager, project_id: str, document: str, lang: str = "en", output: str = "html", offline: bool = False) -> dict:
+def render_html(
+    session_manager,
+    project_id: str,
+    document: str,
+    lang: str = "en",
+    output: str = "html",
+    offline: bool = False,
+    use_wine: bool = False,
+) -> dict:
     from .xml_ops import export_xml
+
     # Validate document
     doc_map = {
         "c_requirementsSpecification": "C_RequirementsSpecification",
@@ -97,81 +112,51 @@ def render_html(session_manager, project_id: str, document: str, lang: str = "en
     }
     if document not in doc_map:
         raise ValueError(f"DOCUMENT_NOT_FOUND: {document}")
-    lang_map = {"en": "xslt/remus/REMUS_English.xsl", "es": "xslt/remus/REMUS_Spanish.xsl", "de": "xslt/remus/REMUS_German.xsl"}
-    if lang not in lang_map:
-        raise ValueError(f"Invalid lang {lang}")
-    xsl_path = Path(lang_map[lang])
-    # Resolve relative to repo root — supports monorepo (/app/xslt), standalone (mcp/xslt), and Docker
-    candidates = [
-        Path(__file__).parent.parent / xsl_path,
-        Path.cwd() / xsl_path,
-        Path.cwd() / "mcp" / xsl_path,
-        Path(__file__).parents[3] / xsl_path,  # monorepo: /app/xslt
-        Path(__file__).parents[2] / xsl_path,  # standalone: mcp/xslt
-        Path(__file__).parents[2] / ".." / xsl_path,
-        Path("/app") / xsl_path,
-        Path("/home/cricro/tiny-projects/remus") / xsl_path,
-    ]
-    xsl_abs = None
-    for c in candidates:
-        if c.exists():
-            xsl_abs = c
-            break
-    if xsl_abs is None:
-        raise FileNotFoundError(f"XSL not found: {xsl_path}")
+
+    xsl_abs = get_xsl_path(lang)
+
     # Export XML to temp
     export_res = export_xml(session_manager, project_id, document=document)
     xml_path = export_res["path"]
-    # Also ensure we have xml file
     if not Path(xml_path).exists():
         tmp = tempfile.mktemp(suffix=".xml")
-        Path(tmp).write_text(export_res["xml"], encoding="iso-8859-1")
+        Path(tmp).write_text(export_res["xml"], encoding="utf-8")
         xml_path = tmp
 
     out_html = tempfile.mktemp(suffix=".html", prefix=f"remus_out_{project_id}_")
     warnings = []
     html_content = None
 
-    # Try Wine msxml3 via cscript transform.vbs
-    vbs_path = Path(__file__).parent.parent / "assets" / "transform.vbs"
-    wine_available = shutil.which("wine") is not None
+    wine_requested = use_wine or os.getenv("REMUS_USE_WINE", "").lower() in ("1", "true", "yes")
 
-    wine_prefix = os.getenv("WINEPREFIX")
-    candidate_msxml_paths = []
-    if wine_prefix:
-        candidate_msxml_paths.append(Path(wine_prefix) / "drive_c" / "windows" / "system32" / "msxml3.dll")
-    candidate_msxml_paths.extend([
-        Path.home() / ".wine" / "drive_c" / "windows" / "system32" / "msxml3.dll",
-        Path.cwd() / ".wine" / "drive_c" / "windows" / "system32" / "msxml3.dll",
-        Path("/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/msxml3.dll"),
-        Path("/usr/lib/wine/x86_64-windows/msxml3.dll"),
-        Path("/usr/lib/wine/msxml3.dll"),
-        Path("/usr/lib64/wine/msxml3.dll"),
-        Path("/usr/local/lib/wine/msxml3.dll"),
-        Path("/usr/lib/i386-linux-gnu/wine/msxml3.dll"),
-    ])
+    if wine_requested:
+        vbs_path = Path(__file__).parent.parent / "assets" / "transform.vbs"
+        if not vbs_path.exists():
+            raise RuntimeError(f"WINE_TRANSFORM_FAILED: VBS script not found at {vbs_path}")
+        if not shutil.which("wine"):
+            raise RuntimeError("WINE_NOT_CONFIGURED: Wine executable not found in PATH")
 
-    msxml_found = any(p.exists() for p in candidate_msxml_paths)
+        wine_prefix = os.getenv(ENV_WINEPREFIX)
+        if wine_prefix:
+            msxml_path = Path(wine_prefix) / "drive_c" / "windows" / "system32" / "msxml3.dll"
+        else:
+            msxml_path = Path.home() / ".wine" / "drive_c" / "windows" / "system32" / "msxml3.dll"
 
-    if not wine_available:
-        warnings.append("WINE_NOT_CONFIGURED: Wine not found, using lxml fallback")
-    elif not msxml_found:
-        warnings.append("WINE_NOT_CONFIGURED: msxml3.dll not found in standard paths, using lxml fallback")
+        if not msxml_path.exists():
+            raise RuntimeError(f"WINE_NOT_CONFIGURED: msxml3.dll not found at {msxml_path}")
 
-    if wine_available and vbs_path.exists():
+        cmd = ["wine", "cscript", "//NoLogo", str(vbs_path), str(xml_path), str(xsl_abs)]
         try:
-            cmd = ["wine", "cscript", "//NoLogo", str(vbs_path), str(xml_path), str(xsl_abs)]
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_SECONDS)
             if r.returncode == 0 and r.stdout.strip():
                 html_content = r.stdout
                 Path(out_html).write_text(html_content, encoding="utf-8")
             else:
-                warnings.append(f"Wine transform failed: {r.stderr[:500] or r.stdout[:500]}; using lxml fallback")
+                raise RuntimeError(f"WINE_TRANSFORM_FAILED: {r.stderr.strip() or r.stdout.strip()}")
         except Exception as e:
-            warnings.append(f"Wine exception {e}; using lxml fallback")
-
-    if html_content is None:
-        # lxml fallback with registered extension functions
+            raise RuntimeError(f"WINE_TRANSFORM_FAILED: {e}") from e
+    else:
+        # Standard deterministic lxml renderer
         try:
             _init_lxml_namespaces()
             from lxml import etree
@@ -189,27 +174,45 @@ def render_html(session_manager, project_id: str, document: str, lang: str = "en
             html_content = str(result)
             Path(out_html).write_text(html_content, encoding="utf-8")
         except Exception as e:
-            warnings.append(f"lxml fallback failed: {e}; returning minimal HTML")
-            html_content = f"<!doctype html><html><head><meta charset='utf-8'><title>{project_id}</title></head><body><h1>REMUS Project {project_id}</h1><pre>{Path(xml_path).read_text(encoding='iso-8859-1', errors='ignore')[:5000]}</pre></body></html>"
-            Path(out_html).write_text(html_content, encoding="utf-8")
+            raise RuntimeError(f"LXML_RENDER_FAILED: {e}") from e
+
     # Handle pdf
     if output == "pdf":
         pdf_path = out_html.replace(".html", ".pdf")
-        # Try wkhtmltopdf or chromium
         if shutil.which("wkhtmltopdf"):
             try:
-                subprocess.run(["wkhtmltopdf", out_html, pdf_path], capture_output=True, timeout=30)
-                return {"html": html_content[:100000] if html_content else "", "path": pdf_path, "warnings": warnings, "project_id": project_id}
+                subprocess.run(
+                    ["wkhtmltopdf", out_html, pdf_path],
+                    capture_output=True,
+                    timeout=SUBPROCESS_TIMEOUT_SECONDS,
+                    check=True,
+                )
+                return {
+                    "html": html_content[:MCP_RESPONSE_MAX_HTML] if html_content else "",
+                    "path": pdf_path,
+                    "warnings": warnings,
+                    "project_id": project_id,
+                }
             except Exception as e:
-                warnings.append(f"wkhtmltopdf failed: {e}")
-        if shutil.which("chromium"):
+                raise RuntimeError(f"PDF_GENERATION_FAILED: wkhtmltopdf failed: {e}") from e
+        elif shutil.which("chromium"):
             try:
-                subprocess.run(["chromium", "--headless", "--disable-gpu", "--print-to-pdf=" + pdf_path, out_html], capture_output=True, timeout=30)
-                return {"html": html_content[:100000] if html_content else "", "path": pdf_path, "warnings": warnings, "project_id": project_id}
+                subprocess.run(
+                    ["chromium", "--headless", "--disable-gpu", f"--print-to-pdf={pdf_path}", out_html],
+                    capture_output=True,
+                    timeout=SUBPROCESS_TIMEOUT_SECONDS,
+                    check=True,
+                )
+                return {
+                    "html": html_content[:MCP_RESPONSE_MAX_HTML] if html_content else "",
+                    "path": pdf_path,
+                    "warnings": warnings,
+                    "project_id": project_id,
+                }
             except Exception as e:
-                warnings.append(f"chromium pdf failed: {e}")
-        warnings.append("PDF generation requested but no converter available; returned HTML")
+                raise RuntimeError(f"PDF_GENERATION_FAILED: chromium failed: {e}") from e
+        else:
+            raise RuntimeError("PDF_CONVERTER_NOT_FOUND: Neither wkhtmltopdf nor chromium is available")
 
-    # Truncate html for MCP response
-    html_trunc = html_content[:100000] if html_content else ""
+    html_trunc = html_content[:MCP_RESPONSE_MAX_HTML] if html_content else ""
     return {"html": html_trunc, "path": out_html, "warnings": warnings, "project_id": project_id}

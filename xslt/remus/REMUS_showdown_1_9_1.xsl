@@ -3,7 +3,7 @@
 <!-- ======================================================== -->
 <!-- File    : REMUS_showdown_1_9_1.xsl                       -->
 <!-- Content : REM XSLT for subjects at US - showdown 1.9.1   -->
-<!-- Author  : Amador Durán Toro                              -->
+<!-- Author  : Amador Durï¿½n Toro                              -->
 <!-- Date    : 2021/01/06                                     -->
 <!-- Version : 3.1                                            -->
 <!-- ======================================================== -->
@@ -192,7 +192,7 @@
       },
       metadata: {
         defaultValue: false,
-        description: 'Enable support for document metadata (defined at the top of the document between `«««` and `»»»` or between `---` and `---`).',
+        description: 'Enable support for document metadata (defined at the top of the document between `ï¿½ï¿½ï¿½` and `ï¿½ï¿½ï¿½` or between `---` and `---`).',
         type: 'boolean'
       },
       splitAdjacentBlockquotes: {
@@ -712,7 +712,7 @@
   function escapeCharactersCallback (wholeMatch, m1) {
     'use strict';
     var charCodeToEscape = m1.charCodeAt(0);
-    return '¨E' + charCodeToEscape + 'E';
+    return 'ï¿½E' + charCodeToEscape + 'E';
   }
   
   /**
@@ -2313,17 +2313,8 @@
         ext = showdown.helper.stdExtName(ext);
         name = ext;
   
-        // LEGACY_SUPPORT CODE
-        if (showdown.extensions[ext]) {
-          console.warn('DEPRECATION WARNING: ' + ext + ' is an old extension that uses a deprecated loading method.' +
-            'Please inform the developer that the extension should be updated!');
-          legacyExtensionLoading(showdown.extensions[ext], ext);
-          return;
-          // END LEGACY SUPPORT CODE
-  
-        } else if (!showdown.helper.isUndefined(extensions[ext])) {
+        if (!showdown.helper.isUndefined(extensions[ext])) {
           ext = extensions[ext];
-  
         } else {
           throw Error('Extension "' + ext + '" could not be loaded. It was either not found or is not a valid extension.');
         }
@@ -2369,31 +2360,7 @@
      * @param {*} ext
      * @param {string} name
      */
-    function legacyExtensionLoading (ext, name) {
-      if (typeof ext === 'function') {
-        ext = ext(new showdown.Converter());
-      }
-      if (!showdown.helper.isArray(ext)) {
-        ext = [ext];
-      }
-      var valid = validate(ext, name);
-  
-      if (!valid.valid) {
-        throw Error(valid.error);
-      }
-  
-      for (var i = 0; i < ext.length; ++i) {
-        switch (ext[i].type) {
-          case 'lang':
-            langExtensions.push(ext[i]);
-            break;
-          case 'output':
-            outputModifiers.push(ext[i]);
-            break;
-          default:// should never reach here
-            throw Error('Extension loader error: Type unrecognized!!!');
-        }
-      }
+
     }
   
     /**
@@ -2485,15 +2452,15 @@
         }
       };
   
-      // This lets us use ¨ trema as an escape char to avoid md5 hashes
+      // This lets us use ï¿½ trema as an escape char to avoid md5 hashes
       // The choice of character is arbitrary; anything that isn't
       // magic in Markdown will work.
-      text = text.replace(/¨/g, '¨T');
+      text = text.replace(/ï¿½/g, 'ï¿½T');
   
-      // Replace $ with ¨D
+      // Replace $ with ï¿½D
       // RegExp interprets $ as a special character
       // when it's in a replacement string
-      text = text.replace(/\$/g, '¨D');
+      text = text.replace(/\$/g, 'ï¿½D');
   
       // Standardize line endings
       text = text.replace(/\r\n/g, '\n'); // DOS to Unix
@@ -2537,10 +2504,10 @@
       text = showdown.subParser('unescapeSpecialChars')(text, options, globals);
   
       // attacklab: Restore dollar signs
-      text = text.replace(/¨D/g, '$$');
+      text = text.replace(/ï¿½D/g, '$$');
   
       // attacklab: Restore tremas
-      text = text.replace(/¨T/g, '¨');
+      text = text.replace(/ï¿½T/g, 'ï¿½');
   
       // render a complete html document instead of a partial if the option is enabled
       text = showdown.subParser('completeHTMLDocument')(text, options, globals);
@@ -2570,7 +2537,7 @@
       // due to an edge case, we need to find this: > <
       // to prevent removing of non silent white spaces
       // ex: <em>this is</em> <strong>sparta</strong>
-      src = src.replace(/>[ \t]+</, '>¨NBSP;<');
+      src = src.replace(/>[ \t]+</, '>ï¿½NBSP;<');
   
       if (!HTMLParser) {
         if (window && window.document) {
@@ -2863,7 +2830,7 @@
       // to external links. Hash links (#) open in same page
       if (options.openLinksInNewWindow && !/^#/.test(url)) {
         // escaped _
-        result += ' rel="noopener noreferrer" target="¨E95Eblank"';
+        result += ' rel="noopener noreferrer" target="ï¿½E95Eblank"';
       }
   
       result += '>' + linkText + '</a>';
@@ -2902,7 +2869,7 @@
         var lnk = options.ghMentionsLink.replace(/\{u}/g, username),
             target = '';
         if (options.openLinksInNewWindow) {
-          target = ' rel="noopener noreferrer" target="¨E95Eblank"';
+          target = ' rel="noopener noreferrer" target="ï¿½E95Eblank"';
         }
         return st + '<a href="' + lnk + '"' + target + '>' + mentions + '</a>';
       });
@@ -2936,7 +2903,7 @@
             append = trailingPunctuation;
           }
           if (options.openLinksInNewWindow) {
-            target = ' rel="noopener noreferrer" target="¨E95Eblank"';
+            target = ' rel="noopener noreferrer" target="ï¿½E95Eblank"';
           }
           return lmc + '<a href="' + link + '"' + target + '>' + lnkTxt + '</a>' + append + tmc;
         };
@@ -3045,7 +3012,7 @@
       bq = bq.replace(/^[ \t]*>[ \t]?/gm, ''); // trim one level of quoting
   
       // attacklab: clean up hack
-      bq = bq.replace(/¨0/g, '');
+      bq = bq.replace(/ï¿½0/g, '');
   
       bq = bq.replace(/^[ \t]+$/gm, ''); // trim whitespace-only lines
       bq = showdown.subParser('githubCodeBlocks')(bq, options, globals);
@@ -3056,8 +3023,8 @@
       bq = bq.replace(/(\s*<pre>[^\r]+?<\/pre>)/gm, function (wholeMatch, m1) {
         var pre = m1;
         // attacklab: hack around Konqueror 3.5.4 bug:
-        pre = pre.replace(/^  /mg, '¨0');
-        pre = pre.replace(/¨0/g, '');
+        pre = pre.replace(/^  /mg, 'ï¿½0');
+        pre = pre.replace(/ï¿½0/g, '');
         return pre;
       });
   
@@ -3077,9 +3044,9 @@
     text = globals.converter._dispatch('codeBlocks.before', text, options, globals);
   
     // sentinel workarounds for lack of \A and \Z, safari\khtml bug
-    text += '¨0';
+    text += 'ï¿½0';
   
-    var pattern = /(?:\n\n|^)((?:(?:[ ]{4}|\t).*\n+)+)(\n*[ ]{0,3}[^ \t\n]|(?=¨0))/g;
+    var pattern = /(?:\n\n|^)((?:(?:[ ]{4}|\t).*\n+)+)(\n*[ ]{0,3}[^ \t\n]|(?=ï¿½0))/g;
     text = text.replace(pattern, function (wholeMatch, m1, m2) {
       var codeblock = m1,
           nextChar = m2,
@@ -3101,7 +3068,7 @@
     });
   
     // strip sentinel
-    text = text.replace(/¨0/, '');
+    text = text.replace(/ï¿½0/, '');
   
     text = globals.converter._dispatch('codeBlocks.after', text, options, globals);
     return text;
@@ -3230,10 +3197,10 @@
     text = text.replace(/\t(?=\t)/g, '    '); // g_tab_width
   
     // replace the nth with two sentinels
-    text = text.replace(/\t/g, '¨A¨B');
+    text = text.replace(/\t/g, 'ï¿½Aï¿½B');
   
     // use the sentinel to anchor our regex so it doesn't explode
-    text = text.replace(/¨B(.+?)¨A/g, function (wholeMatch, m1) {
+    text = text.replace(/ï¿½B(.+?)ï¿½A/g, function (wholeMatch, m1) {
       var leadingText = m1,
           numSpaces = 4 - leadingText.length % 4;  // g_tab_width
   
@@ -3246,8 +3213,8 @@
     });
   
     // clean up sentinels
-    text = text.replace(/¨A/g, '    ');  // g_tab_width
-    text = text.replace(/¨B/g, '');
+    text = text.replace(/ï¿½A/g, '    ');  // g_tab_width
+    text = text.replace(/ï¿½B/g, '');
   
     text = globals.converter._dispatch('detab.after', text, options, globals);
     return text;
@@ -3410,7 +3377,7 @@
   
     text = globals.converter._dispatch('githubCodeBlocks.before', text, options, globals);
   
-    text += '¨0';
+    text += 'ï¿½0';
   
     text = text.replace(/(?:^|\n)(?: {0,3})(```+|~~~+)(?: *)([^\s`~]*)\n([\s\S]*?)\n(?: {0,3})\1/g, function (wholeMatch, delim, language, codeblock) {
       var end = (options.omitExtraWLInCodeBlocks) ? '' : '\n';
@@ -3428,11 +3395,11 @@
       // Since GHCodeblocks can be false positives, we need to
       // store the primitive text and the parsed text in a global var,
       // and then return a token
-      return '\n\n¨G' + (globals.ghCodeBlocks.push({text: wholeMatch, codeblock: codeblock}) - 1) + 'G\n\n';
+      return '\n\nï¿½G' + (globals.ghCodeBlocks.push({text: wholeMatch, codeblock: codeblock}) - 1) + 'G\n\n';
     });
   
     // attacklab: strip sentinel
-    text = text.replace(/¨0/, '');
+    text = text.replace(/ï¿½0/, '');
   
     return globals.converter._dispatch('githubCodeBlocks.after', text, options, globals);
   });
@@ -3441,7 +3408,7 @@
     'use strict';
     text = globals.converter._dispatch('hashBlock.before', text, options, globals);
     text = text.replace(/(^\n+|\n+$)/g, '');
-    text = '\n\n¨K' + (globals.gHtmlBlocks.push(text) - 1) + 'K\n\n';
+    text = '\n\nï¿½K' + (globals.gHtmlBlocks.push(text) - 1) + 'K\n\n';
     text = globals.converter._dispatch('hashBlock.after', text, options, globals);
     return text;
   });
@@ -3455,7 +3422,7 @@
   
     var repFunc = function (wholeMatch, match, left, right) {
       var codeblock = left + showdown.subParser('encodeCode')(match, options, globals) + right;
-      return '¨C' + (globals.gHtmlSpans.push(codeblock) - 1) + 'C';
+      return 'ï¿½C' + (globals.gHtmlSpans.push(codeblock) - 1) + 'C';
     };
   
     // Hash naked <code>
@@ -3478,8 +3445,8 @@
       // strip trailing blank lines
       blockText = blockText.replace(/\n+$/g, '');
   
-      // Replace the element text with a marker ("¨KxK" where x is its key)
-      blockText = '\n\n¨K' + (globals.gHtmlBlocks.push(blockText) - 1) + 'K\n\n';
+      // Replace the element text with a marker ("ï¿½KxK" where x is its key)
+      blockText = '\n\nï¿½K' + (globals.gHtmlBlocks.push(blockText) - 1) + 'K\n\n';
   
       return blockText;
     };
@@ -3532,7 +3499,7 @@
           if (left.search(/\bmarkdown\b/) !== -1) {
             txt = left + globals.converter.makeHtml(match) + right;
           }
-          return '\n\n¨K' + (globals.gHtmlBlocks.push(txt) - 1) + 'K\n\n';
+          return '\n\nï¿½K' + (globals.gHtmlBlocks.push(txt) - 1) + 'K\n\n';
         };
   
     if (options.backslashEscapesHTMLTags) {
@@ -3573,7 +3540,7 @@
   
     // Special case for standalone HTML comments
     text = showdown.helper.replaceRecursiveRegExp(text, function (txt) {
-      return '\n\n¨K' + (globals.gHtmlBlocks.push(txt) - 1) + 'K\n\n';
+      return '\n\nï¿½K' + (globals.gHtmlBlocks.push(txt) - 1) + 'K\n\n';
     }, '^ {0,3}<!--', '-->', 'gm');
   
     // PHP and ASP-style processor instructions (<?...?> and <%...%>)
@@ -3592,7 +3559,7 @@
     text = globals.converter._dispatch('hashHTMLSpans.before', text, options, globals);
   
     function hashHTMLSpan (html) {
-      return '¨C' + (globals.gHtmlSpans.push(html) - 1) + 'C';
+      return 'ï¿½C' + (globals.gHtmlSpans.push(html) - 1) + 'C';
     }
   
     // Hash Self Closing tags
@@ -3633,16 +3600,16 @@
           // limiter to prevent infinite loop (assume 10 as limit for recurse)
           limit = 0;
   
-      while (/¨C(\d+)C/.test(repText)) {
+      while (/ï¿½C(\d+)C/.test(repText)) {
         var num = RegExp.$1;
-        repText = repText.replace('¨C' + num + 'C', globals.gHtmlSpans[num]);
+        repText = repText.replace('ï¿½C' + num + 'C', globals.gHtmlSpans[num]);
         if (limit === 10) {
           console.error('maximum nesting of 10 spans reached!!!');
           break;
         }
         ++limit;
       }
-      text = text.replace('¨C' + i + 'C', repText);
+      text = text.replace('ï¿½C' + i + 'C', repText);
     }
   
     text = globals.converter._dispatch('unhashHTMLSpans.after', text, options, globals);
@@ -3659,7 +3626,7 @@
     var repFunc = function (wholeMatch, match, left, right) {
       // encode html entities
       var codeblock = left + showdown.subParser('encodeCode')(match, options, globals) + right;
-      return '\n\n¨G' + (globals.ghCodeBlocks.push({text: wholeMatch, codeblock: codeblock}) - 1) + 'G\n\n';
+      return '\n\nï¿½G' + (globals.ghCodeBlocks.push({text: wholeMatch, codeblock: codeblock}) - 1) + 'G\n\n';
     };
   
     // Hash <pre><code>
@@ -3756,21 +3723,21 @@
       if (options.ghCompatibleHeaderId) {
         title = title
           .replace(/ /g, '-')
-          // replace previously escaped chars (&, ¨ and $)
+          // replace previously escaped chars (&, ï¿½ and $)
           .replace(/&amp;/g, '')
-          .replace(/¨T/g, '')
-          .replace(/¨D/g, '')
+          .replace(/ï¿½T/g, '')
+          .replace(/ï¿½D/g, '')
           // replace rest of the chars (&~$ are repeated as they might have been escaped)
           // borrowed from github's redcarpet (some they should produce similar results)
-          .replace(/[&+$,\/:;=?@"#{}|^¨~\[\]`\\*)(%.!'<>]/g, '')
+          .replace(/[&+$,\/:;=?@"#{}|^ï¿½~\[\]`\\*)(%.!'<>]/g, '')
           .toLowerCase();
       } else if (options.rawHeaderId) {
         title = title
           .replace(/ /g, '-')
-          // replace previously escaped chars (&, ¨ and $)
+          // replace previously escaped chars (&, ï¿½ and $)
           .replace(/&amp;/g, '&')
-          .replace(/¨T/g, '¨')
-          .replace(/¨D/g, '$')
+          .replace(/ï¿½T/g, 'ï¿½')
+          .replace(/ï¿½D/g, '$')
           // replace " and '
           .replace(/["']/g, '-')
           .toLowerCase();
@@ -4028,16 +3995,16 @@
       listStr = listStr.replace(/\n{2,}$/, '\n');
   
       // attacklab: add sentinel to emulate \z
-      listStr += '¨0';
+      listStr += 'ï¿½0';
   
-      var rgx = /(\n)?(^ {0,3})([*+-]|\d+[.])[ \t]+((\[(x|X| )?])?[ \t]*[^\r]+?(\n{1,2}))(?=\n*(¨0| {0,3}([*+-]|\d+[.])[ \t]+))/gm,
-          isParagraphed = (/\n[ \t]*\n(?!¨0)/.test(listStr));
+      var rgx = /(\n)?(^ {0,3})([*+-]|\d+[.])[ \t]+((\[(x|X| )?])?[ \t]*[^\r]+?(\n{1,2}))(?=\n*(ï¿½0| {0,3}([*+-]|\d+[.])[ \t]+))/gm,
+          isParagraphed = (/\n[ \t]*\n(?!ï¿½0)/.test(listStr));
   
       // Since version 1.5, nesting sublists requires 4 spaces (or 1 tab) indentation,
       // which is a syntax breaking change
       // activating this option reverts to old behavior
       if (options.disableForced4SpacesIndentedSublists) {
-        rgx = /(\n)?(^ {0,3})([*+-]|\d+[.])[ \t]+((\[(x|X| )?])?[ \t]*[^\r]+?(\n{1,2}))(?=\n*(¨0|\2([*+-]|\d+[.])[ \t]+))/gm;
+        rgx = /(\n)?(^ {0,3})([*+-]|\d+[.])[ \t]+((\[(x|X| )?])?[ \t]*[^\r]+?(\n{1,2}))(?=\n*(ï¿½0|\2([*+-]|\d+[.])[ \t]+))/gm;
       }
   
       listStr = listStr.replace(rgx, function (wholeMatch, m1, m2, m3, m4, taskbtn, checked) {
@@ -4065,10 +4032,10 @@
         // <ul><li><li><li>a</li></li></li></ul>
         // instead of:
         // <ul><li>- - a</li></ul>
-        // So, to prevent it, we will put a marker (¨A)in the beginning of the line
+        // So, to prevent it, we will put a marker (ï¿½A)in the beginning of the line
         // Kind of hackish/monkey patching, but seems more effective than overcomplicating the list parser
         item = item.replace(/^([-*+]|\d\.)[ \t]+[\S\n ]*/g, function (wm2) {
-          return '¨A' + wm2;
+          return 'ï¿½A' + wm2;
         });
   
         // m1 - Leading line or
@@ -4092,8 +4059,8 @@
           }
         }
   
-        // now we need to remove the marker (¨A)
-        item = item.replace('¨A', '');
+        // now we need to remove the marker (ï¿½A)
+        item = item.replace('ï¿½A', '');
         // we can finally wrap the line in list item tags
         item =  '<li' + bulletStyle + '>' + item + '</li>\n';
   
@@ -4101,7 +4068,7 @@
       });
   
       // attacklab: strip sentinel
-      listStr = listStr.replace(/¨0/g, '');
+      listStr = listStr.replace(/ï¿½0/g, '');
   
       globals.gListLevel--;
   
@@ -4168,17 +4135,17 @@
     text = globals.converter._dispatch('lists.before', text, options, globals);
     // add sentinel to hack around khtml/safari bug:
     // http://bugs.webkit.org/show_bug.cgi?id=11231
-    text += '¨0';
+    text += 'ï¿½0';
   
     if (globals.gListLevel) {
-      text = text.replace(/^(( {0,3}([*+-]|\d+[.])[ \t]+)[^\r]+?(¨0|\n{2,}(?=\S)(?![ \t]*(?:[*+-]|\d+[.])[ \t]+)))/gm,
+      text = text.replace(/^(( {0,3}([*+-]|\d+[.])[ \t]+)[^\r]+?(ï¿½0|\n{2,}(?=\S)(?![ \t]*(?:[*+-]|\d+[.])[ \t]+)))/gm,
         function (wholeMatch, list, m2) {
           var listType = (m2.search(/[*+-]/g) > -1) ? 'ul' : 'ol';
           return parseConsecutiveLists(list, listType, true);
         }
       );
     } else {
-      text = text.replace(/(\n\n|^\n?)(( {0,3}([*+-]|\d+[.])[ \t]+)[^\r]+?(¨0|\n{2,}(?=\S)(?![ \t]*(?:[*+-]|\d+[.])[ \t]+)))/gm,
+      text = text.replace(/(\n\n|^\n?)(( {0,3}([*+-]|\d+[.])[ \t]+)[^\r]+?(ï¿½0|\n{2,}(?=\S)(?![ \t]*(?:[*+-]|\d+[.])[ \t]+)))/gm,
         function (wholeMatch, m1, list, m3) {
           var listType = (m3.search(/[*+-]/g) > -1) ? 'ul' : 'ol';
           return parseConsecutiveLists(list, listType, false);
@@ -4187,7 +4154,7 @@
     }
   
     // strip sentinel
-    text = text.replace(/¨0/, '');
+    text = text.replace(/ï¿½0/, '');
     text = globals.converter._dispatch('lists.after', text, options, globals);
     return text;
   });
@@ -4223,9 +4190,9 @@
       });
     }
   
-    text = text.replace(/^\s*«««+(\S*?)\n([\s\S]+?)\n»»»+\n/, function (wholematch, format, content) {
+    text = text.replace(/^\s*ï¿½ï¿½ï¿½+(\S*?)\n([\s\S]+?)\nï¿½ï¿½ï¿½+\n/, function (wholematch, format, content) {
       parseMetadataContents(content);
-      return '¨M';
+      return 'ï¿½M';
     });
   
     text = text.replace(/^\s*---+(\S*?)\n([\s\S]+?)\n---+\n/, function (wholematch, format, content) {
@@ -4233,10 +4200,10 @@
         globals.metadata.format = format;
       }
       parseMetadataContents(content);
-      return '¨M';
+      return 'ï¿½M';
     });
   
-    text = text.replace(/¨M/g, '');
+    text = text.replace(/ï¿½M/g, '');
   
     text = globals.converter._dispatch('metadata.after', text, options, globals);
     return text;
@@ -4251,10 +4218,10 @@
   
     // attacklab: hack around Konqueror 3.5.4 bug:
     // "----------bug".replace(/^-/g,"") == "bug"
-    text = text.replace(/^(\t|[ ]{1,4})/gm, '¨0'); // attacklab: g_tab_width
+    text = text.replace(/^(\t|[ ]{1,4})/gm, 'ï¿½0'); // attacklab: g_tab_width
   
     // attacklab: clean up hack
-    text = text.replace(/¨0/g, '');
+    text = text.replace(/ï¿½0/g, '');
   
     text = globals.converter._dispatch('outdent.after', text, options, globals);
     return text;
@@ -4278,7 +4245,7 @@
     for (var i = 0; i < end; i++) {
       var str = grafs[i];
       // if this is an HTML marker, copy it
-      if (str.search(/¨(K|G)(\d+)\1/g) >= 0) {
+      if (str.search(/ï¿½(K|G)(\d+)\1/g) >= 0) {
         grafsOut.push(str);
   
       // test for presence of characters to prevent empty lines being parsed
@@ -4299,7 +4266,7 @@
           codeFlag = false;
       // if this is a marker for an html block...
       // use RegExp.test instead of string.search because of QML bug
-      while (/¨(K|G)(\d+)\1/.test(grafsOutIt)) {
+      while (/ï¿½(K|G)(\d+)\1/.test(grafsOutIt)) {
         var delim = RegExp.$1,
             num   = RegExp.$2;
   
@@ -4316,7 +4283,7 @@
         }
         blockText = blockText.replace(/\$/g, '$$$$'); // Escape any dollar signs
   
-        grafsOutIt = grafsOutIt.replace(/(\n\n)?¨(K|G)\d+\2(\n\n)?/, blockText);
+        grafsOutIt = grafsOutIt.replace(/(\n\n)?ï¿½(K|G)\d+\2(\n\n)?/, blockText);
         // Check if grafsOutIt is a pre->code
         if (/^<pre\b[^>]*>\s*<code\b[^>]*>/.test(grafsOutIt)) {
           codeFlag = true;
@@ -4390,7 +4357,7 @@
     if (options.simpleLineBreaks) {
       // GFM style hard breaks
       // only add line breaks if the text does not contain a block (special case for lists)
-      if (!/\n\n¨K/.test(text)) {
+      if (!/\n\nï¿½K/.test(text)) {
         text = text.replace(/\n+/g, '<br />\n');
       }
     } else {
@@ -4429,11 +4396,11 @@
   showdown.subParser('stripLinkDefinitions', function (text, options, globals) {
     'use strict';
   
-    var regex       = /^ {0,3}\[(.+)]:[ \t]*\n?[ \t]*<?([^>\s]+)>?(?: =([*\d]+[A-Za-z%]{0,4})x([*\d]+[A-Za-z%]{0,4}))?[ \t]*\n?[ \t]*(?:(\n*)["|'(](.+?)["|')][ \t]*)?(?:\n+|(?=¨0))/gm,
-        base64Regex = /^ {0,3}\[(.+)]:[ \t]*\n?[ \t]*<?(data:.+?\/.+?;base64,[A-Za-z0-9+/=\n]+?)>?(?: =([*\d]+[A-Za-z%]{0,4})x([*\d]+[A-Za-z%]{0,4}))?[ \t]*\n?[ \t]*(?:(\n*)["|'(](.+?)["|')][ \t]*)?(?:\n\n|(?=¨0)|(?=\n\[))/gm;
+    var regex       = /^ {0,3}\[(.+)]:[ \t]*\n?[ \t]*<?([^>\s]+)>?(?: =([*\d]+[A-Za-z%]{0,4})x([*\d]+[A-Za-z%]{0,4}))?[ \t]*\n?[ \t]*(?:(\n*)["|'(](.+?)["|')][ \t]*)?(?:\n+|(?=ï¿½0))/gm,
+        base64Regex = /^ {0,3}\[(.+)]:[ \t]*\n?[ \t]*<?(data:.+?\/.+?;base64,[A-Za-z0-9+/=\n]+?)>?(?: =([*\d]+[A-Za-z%]{0,4})x([*\d]+[A-Za-z%]{0,4}))?[ \t]*\n?[ \t]*(?:(\n*)["|'(](.+?)["|')][ \t]*)?(?:\n\n|(?=ï¿½0)|(?=\n\[))/gm;
   
     // attacklab: sentinel workarounds for lack of \A and \Z, safari\khtml bug
-    text += '¨0';
+    text += 'ï¿½0';
   
     var replaceFunc = function (wholeMatch, linkId, url, width, height, blankLines, title) {
       linkId = linkId.toLowerCase();
@@ -4470,7 +4437,7 @@
     text = text.replace(regex, replaceFunc);
   
     // attacklab: strip sentinel
-    text = text.replace(/¨0/, '');
+    text = text.replace(/ï¿½0/, '');
   
     return text;
   });
@@ -4482,9 +4449,9 @@
       return text;
     }
   
-    var tableRgx       = /^ {0,3}\|?.+\|.+\n {0,3}\|?[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*:?[ \t]*(?:[-=]){2,}[\s\S]+?(?:\n\n|¨0)/gm,
-        //singeColTblRgx = /^ {0,3}\|.+\|\n {0,3}\|[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*\n(?: {0,3}\|.+\|\n)+(?:\n\n|¨0)/gm;
-        singeColTblRgx = /^ {0,3}\|.+\|[ \t]*\n {0,3}\|[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*\n( {0,3}\|.+\|[ \t]*\n)*(?:\n|¨0)/gm;
+    var tableRgx       = /^ {0,3}\|?.+\|.+\n {0,3}\|?[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*:?[ \t]*(?:[-=]){2,}[\s\S]+?(?:\n\n|ï¿½0)/gm,
+        //singeColTblRgx = /^ {0,3}\|.+\|\n {0,3}\|[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*\n(?: {0,3}\|.+\|\n)+(?:\n\n|ï¿½0)/gm;
+        singeColTblRgx = /^ {0,3}\|.+\|[ \t]*\n {0,3}\|[ \t]*:?[ \t]*(?:[-=]){2,}[ \t]*:?[ \t]*\|[ \t]*\n( {0,3}\|.+\|[ \t]*\n)*(?:\n|ï¿½0)/gm;
   
     function parseStyles (sLine) {
       if (/^:[ \t]*--*$/.test(sLine)) {
@@ -4501,8 +4468,7 @@
     function parseHeaders (header, style) {
       var id = '';
       header = header.trim();
-      // support both tablesHeaderId and tableHeaderId due to error in documentation so we don't break backwards compatibility
-      if (options.tablesHeaderId || options.tableHeaderId) {
+      if (options.tablesHeaderId) {
         id = ' id="' + header.replace(/ /g, '_').toLowerCase() + '"';
       }
       header = showdown.subParser('spanGamut')(header, options, globals);
@@ -4658,7 +4624,7 @@
     'use strict';
     text = globals.converter._dispatch('unescapeSpecialChars.before', text, options, globals);
   
-    text = text.replace(/¨E(\d+)E/g, function (wholeMatch, m1) {
+    text = text.replace(/ï¿½E(\d+)E/g, function (wholeMatch, m1) {
       var charCodeToReplace = parseInt(m1);
       return String.fromCharCode(charCodeToReplace);
     });
@@ -5117,8 +5083,8 @@
     // multiple spaces are collapsed
     txt = txt.replace(/ +/g, ' ');
   
-    // replace the custom ¨NBSP; with a space
-    txt = txt.replace(/¨NBSP;/g, ' ');
+    // replace the custom ï¿½NBSP; with a space
+    txt = txt.replace(/ï¿½NBSP;/g, ' ');
   
     // ", <, > and & should replace escaped html entities
     txt = showdown.helper.unescapeHTMLEntities(txt);

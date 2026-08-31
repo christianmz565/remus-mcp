@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..jet.schema import TYPE_TO_TABLE, TABLE_TO_TYPE, REQUIRED_FIELDS
+from ..config import DEFAULT_LIMIT, MAX_LIMIT
 from ..jet.mdbtools import export_table, execute_sql, max_oid, sql_escape, JetWriteNotSupported
+from ..jet.schema import TYPE_TO_TABLE, TABLE_TO_TYPE, REQUIRED_FIELDS
 from ..validation import validate_create, validate_update
 
 def _ensure_type(type_name: str):
@@ -15,9 +16,9 @@ def _table_for(type_name: str) -> str:
     _ensure_type(type_name)
     return TYPE_TO_TABLE[type_name]
 
-def rem_list(session_manager, project_id: str, type: str, document: int | None = None, parent: int | None = None, search: str | None = None, filters: dict | None = None, limit: int = 50, offset: int = 0, order_by: str = "order") -> dict[str, Any]:
-    if limit > 200:
-        raise ValueError("LIMIT_TOO_LARGE: limit capped at 200")
+def rem_list(session_manager, project_id: str, type: str, document: int | None = None, parent: int | None = None, search: str | None = None, filters: dict | None = None, limit: int = DEFAULT_LIMIT, offset: int = 0, order_by: str = "order") -> dict[str, Any]:
+    if limit > MAX_LIMIT:
+        raise ValueError(f"LIMIT_TOO_LARGE: limit capped at {MAX_LIMIT}")
     table = _table_for(type)
     session = session_manager.get(project_id)
     rows = export_table(str(session.db_path), table)
@@ -25,27 +26,27 @@ def rem_list(session_manager, project_id: str, type: str, document: int | None =
     # Filters
     filtered = rows
     if document is not None:
-        filtered = [r for r in filtered if int(r.get("document", -1) or -1) == int(document) or int(r.get("Document", -1) or -1) == int(document)]
+        filtered = [r for r in filtered if r.get("document") is not None and int(r["document"]) == int(document)]
     if parent is not None:
-        filtered = [r for r in filtered if r.get("parent") is not None and int(r.get("parent") or -1) == int(parent)]
+        filtered = [r for r in filtered if r.get("parent") is not None and int(r["parent"]) == int(parent)]
     if filters:
         for k, v in filters.items():
             filtered = [r for r in filtered if str(r.get(k, "")) == str(v) or r.get(k) == v]
     if search:
         s = search.lower()
         def matches(r):
-            for f in ["name", "description", "comments", "Name", "Description"]:
+            for f in ["name", "description", "comments"]:
                 val = r.get(f)
                 if val and s in str(val).lower():
                     return True
             return False
         filtered = [r for r in filtered if matches(r)]
     # Order
-    if order_by and filtered and order_by in filtered[0]:
-        try:
+    if order_by:
+        if filtered and order_by not in filtered[0]:
+            raise ValueError(f"INVALID_ORDER_BY: {order_by}")
+        if filtered:
             filtered = sorted(filtered, key=lambda r: (r.get(order_by) is None, r.get(order_by)))
-        except Exception:
-            pass
     total_filtered = len(filtered)
     paged = filtered[offset: offset + limit]
     return {"items": paged, "total": total_filtered, "project_id": project_id, "type": type}

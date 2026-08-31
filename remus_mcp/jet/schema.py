@@ -9,7 +9,6 @@ ENTITY_TABLES: dict[str, str] = {
     "Appendix": "appendix",
     "Paragraph": "paragraph",
     "GraphicFile": "graphic_file",
-    "Glossary": "glossary_item",  # Jet table is Glossary, DTD glossaryItem
     "GlossaryItem": "glossary_item",
     "Organization": "organization",
     "Stakeholder": "stakeholder",

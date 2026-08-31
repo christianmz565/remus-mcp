@@ -106,67 +106,18 @@ def export_table(db_path: str, table: str, fmt: str = "json") -> list[dict[str, 
     return out
 
 def query_sql(db_path: str, sql: str) -> list[dict[str, Any]]:
-    """Run SELECT via mdb-sql if available. Fallback to export_table filtering."""
-    if shutil.which("mdb-sql"):
-        # mdb-sql interactive: echo sql | mdb-sql db_path
-        # Try batch mode
-        proc = subprocess.run(
-            ["mdb-sql", "-p", str(db_path)],
-            input=sql + "\n",
-            capture_output=True,
-            text=True,
-        )
-        # Some versions require: mdb-sql db_path < query
-        if proc.returncode != 0 or not proc.stdout.strip():
-            proc2 = subprocess.run(
-                ["mdb-sql", str(db_path)],
-                input=sql + "\ngo\n",
-                capture_output=True,
-                text=True,
-            )
-            if proc2.returncode == 0 and proc2.stdout.strip():
-                # Parse tabular output? For now return raw if JSON-like
-                # mdb-sql output is not JSON, difficult to parse. Raise fallback signal.
-                raise JetWriteNotSupported(f"mdb-sql tabular parse not implemented: {proc2.stdout[:500]}")
-        # If succeeded with parsable output, attempt parse
-        if proc.returncode == 0 and proc.stdout.strip():
-            # Try to detect JSON? Usually mdb-sql -p prints CSV-ish
-            pass
-        raise JetWriteNotSupported("query_sql via mdb-sql not reliably parsable; use export_table filter")
-    raise JetWriteNotSupported("mdb-sql not available")
+    """Query SQL is not supported directly; use export_table filter."""
+    raise JetWriteNotSupported("query_sql not supported; use export_table filter")
 
 def execute_sql(db_path: str, sql: str) -> None:
-    # Try mdb-sql first; on failure fallback to jackcess
-    if shutil.which("mdb-sql"):
-        sql_norm = sql.strip()
-        if not sql_norm.endswith(";"):
-            sql_norm += ";"
-        proc = subprocess.run(
-            ["mdb-sql", str(db_path)],
-            input=sql_norm + "\ngo\n",
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode == 0:
-            if "error" not in proc.stdout.lower() and "error" not in proc.stderr.lower():
-                return
-            if "syntax error" in proc.stdout.lower() or "syntax error" in proc.stderr.lower():
-                pass  # fallback to jackcess
-            else:
-                raise RuntimeError(f"mdb-sql error: stdout={proc.stdout[:1000]} stderr={proc.stderr[:1000]}")
-        else:
-            if "syntax error" not in (proc.stderr + proc.stdout).lower():
-                raise RuntimeError(f"mdb-sql failed: {proc.stderr.strip() or proc.stdout.strip()}")
-    # Fallback to jackcess
+    """Execute SQL directly via Jackcess engine."""
     try:
         from .jackcess import execute_sql_via_jackcess
         execute_sql_via_jackcess(db_path, sql)
-        return
     except ImportError as e:
-        raise JetWriteNotSupported(f"Jackcess fallback not available: {e}")
+        raise JetWriteNotSupported(f"Jackcess engine not available: {e}") from e
     except Exception as e:
         raise RuntimeError(f"Jackcess execute failed for sql={sql[:300]}: {e}") from e
-
 def max_oid(db_path: str, table: str) -> int:
     rows = export_table(db_path, table)
     maxv = 0

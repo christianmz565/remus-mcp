@@ -1,8 +1,9 @@
 """Jackcess/UCanAccess fallback via JPype (lazy)."""
 from __future__ import annotations
 
-import re
+from ..config import get_jars_dir
 import pathlib
+import re
 from typing import Any
 
 _jvm_started = False
@@ -35,34 +36,10 @@ def _ensure_jvm():
                     os.environ["JAVA_HOME"] = str(candidate.parent.parent.parent if candidate.parent.name == "server" else candidate.parent.parent)
                     break
 
-    candidate_dirs = []
-    if os.environ.get("REMUS_JARS_DIR"):
-        candidate_dirs.append(pathlib.Path(os.environ["REMUS_JARS_DIR"]))
-    if os.environ.get("JACKCESS_JARS_DIR"):
-        candidate_dirs.append(pathlib.Path(os.environ["JACKCESS_JARS_DIR"]))
-
-    candidate_dirs.extend([
-        pathlib.Path(__file__).parent.parent / "jars",
-        pathlib.Path(__file__).parent / "jars",
-        pathlib.Path("/app/mcp/jars"),
-        pathlib.Path("/app/jars"),
-        pathlib.Path.cwd() / "mcp" / "jars",
-        pathlib.Path.cwd() / "jars",
-        pathlib.Path("/home/cricro/tiny-projects/remus/mcp/jars"),
-    ])
-
-    jars = []
-    found_dir = None
-    for d in candidate_dirs:
-        if d and d.exists() and d.is_dir():
-            matched = list(d.glob("*.jar"))
-            if matched:
-                jars = matched
-                found_dir = d
-                break
-
+    jars_dir = get_jars_dir()
+    jars = list(jars_dir.glob("*.jar"))
     if not jars:
-        raise RuntimeError(f"No jars found in candidate directories: {[str(d) for d in candidate_dirs]}")
+        raise RuntimeError(f"No jars found in directory: {jars_dir}")
 
     jpype.startJVM(classpath=[str(j) for j in jars])
     _jvm_started = True
