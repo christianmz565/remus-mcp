@@ -35,6 +35,7 @@ def project_create(session_manager, template: str, target_path: str, name: str) 
     if dst.exists():
         raise ValueError(f"Target already exists: {target_path}")
     dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
     # TODO: update name in spec docs? For now set via DB update if possible
     pid = session_manager.open_project(str(dst))
     # Try to update name of first spec

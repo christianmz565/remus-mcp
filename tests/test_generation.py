@@ -22,3 +22,29 @@ def test_render_html(tmp_path):
     assert "<!doctype html>" in res["html"].lower() or "<html" in res["html"].lower()
     # Should contain project name or title
     assert "test" in res["html"].lower() or "remus" in res["html"].lower() or len(res["html"]) > 100
+def test_render_html_with_use_case_description(tmp_path):
+    src = find_base("english")
+    dst = tmp_path / "uc_doc.rem"
+    shutil.copy2(src, dst)
+    sm = SessionManager()
+    pid = sm.open_project(str(dst))
+    
+    # Create use_case with description to exercise rem:bool2space and generate_markdown in XSL
+    crud.rem_create(sm, pid, "use_case", {
+        "name": "UC-Test",
+        "versionMajor": 1,
+        "versionMinor": 0,
+        "description": "This is a **bold markdown** description.",
+        "document": 1
+    })
+    
+    res = generation.render_html(sm, pid, document="c_requirementsSpecification", lang="en")
+    assert "html" in res and "path" in res
+    assert pathlib.Path(res["path"]).exists()
+    
+    # Ensure lxml fallback didn't fail with prefix_space error
+    for w in res.get("warnings", []):
+        assert "lxml fallback failed" not in w
+        
+    assert "<html" in res["html"].lower() or "<!doctype html" in res["html"].lower()
+    assert "uc-test" in res["html"].lower() or "bold markdown" in res["html"].lower() or len(res["html"]) > 500

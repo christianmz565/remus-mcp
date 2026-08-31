@@ -117,10 +117,12 @@ def create_server(session_manager: SessionManager) -> Server:
             # Return isError true via TextContent with error flag? MCP python SDK: raise? We'll return error text with isError handling outside.
             # For now return error JSON and let caller treat as error via exception
             err_code = type(e).__name__
-            msg = str(e)
+            msg = e.args[0] if (e.args and isinstance(e.args[0], str)) else str(e)
+            msg = msg.strip("'\"")
             # Map known prefixes
-            if "INVALID_TYPE" in msg or "LIMIT_TOO_LARGE" in msg or "VALIDATION_ERROR" in msg or "REFERENTIAL_INTEGRITY" in msg or "MATRIX_TOO_LARGE" in msg or "NOT_FOUND" in msg or "PROJECT_NOT_FOUND" in msg or "DB_LOCKED" in msg or "DTD_VALIDATION_ERROR" in msg or "DUPLICATE_TRACE" in msg:
-                return [TextContent(type="text", text=json.dumps({"error": msg, "code": msg.split(":")[0]}, indent=2))]
+            if any(k in msg for k in ["INVALID_TYPE", "LIMIT_TOO_LARGE", "VALIDATION_ERROR", "REFERENTIAL_INTEGRITY", "MATRIX_TOO_LARGE", "NOT_FOUND", "PROJECT_NOT_FOUND", "DB_LOCKED", "DTD_VALIDATION_ERROR", "DUPLICATE_TRACE"]):
+                code = msg.split(":")[0].strip("'\"")
+                return [TextContent(type="text", text=json.dumps({"error": msg, "code": code}, indent=2))]
             # For file not found etc.
             return [TextContent(type="text", text=json.dumps({"error": msg, "code": err_code}, indent=2))]
 

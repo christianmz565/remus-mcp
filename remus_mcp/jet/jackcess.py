@@ -11,23 +11,61 @@ def _ensure_jvm():
     global _jvm_started
     if _jvm_started:
         return
+    import os
+    import shutil
     import jpype
     if jpype.isJVMStarted():
         _jvm_started = True
         return
-    # Find jars
-    jar_dir = pathlib.Path(__file__).parent.parent / "jars"
-    if not jar_dir.exists():
-        jar_dir = pathlib.Path("/home/cricro/tiny-projects/remus/mcp/jars")
-    jars = list(jar_dir.glob("*.jar"))
+
+    # Auto-detect JAVA_HOME if unset but java executable is in PATH
+    if "JAVA_HOME" not in os.environ:
+        java_bin = shutil.which("java")
+        if java_bin:
+            java_path = pathlib.Path(java_bin).resolve()
+            # Common layouts: <jdk>/bin/java -> <jdk> or <jdk>/lib/openjdk/bin/java -> <jdk>/lib/openjdk
+            parent = java_path.parent.parent
+            if (parent / "lib" / "server" / "libjvm.so").exists() or (parent / "lib" / "libjvm.so").exists():
+                os.environ["JAVA_HOME"] = str(parent)
+            elif (parent / "lib" / "openjdk" / "lib" / "server" / "libjvm.so").exists():
+                os.environ["JAVA_HOME"] = str(parent / "lib" / "openjdk")
+            elif parent.parent.name == "store":
+                # Nix store layout search
+                for candidate in parent.glob("**/libjvm.so"):
+                    os.environ["JAVA_HOME"] = str(candidate.parent.parent.parent if candidate.parent.name == "server" else candidate.parent.parent)
+                    break
+
+    candidate_dirs = []
+    if os.environ.get("REMUS_JARS_DIR"):
+        candidate_dirs.append(pathlib.Path(os.environ["REMUS_JARS_DIR"]))
+    if os.environ.get("JACKCESS_JARS_DIR"):
+        candidate_dirs.append(pathlib.Path(os.environ["JACKCESS_JARS_DIR"]))
+
+    candidate_dirs.extend([
+        pathlib.Path(__file__).parent.parent / "jars",
+        pathlib.Path(__file__).parent / "jars",
+        pathlib.Path("/app/mcp/jars"),
+        pathlib.Path("/app/jars"),
+        pathlib.Path.cwd() / "mcp" / "jars",
+        pathlib.Path.cwd() / "jars",
+        pathlib.Path("/home/cricro/tiny-projects/remus/mcp/jars"),
+    ])
+
+    jars = []
+    found_dir = None
+    for d in candidate_dirs:
+        if d and d.exists() and d.is_dir():
+            matched = list(d.glob("*.jar"))
+            if matched:
+                jars = matched
+                found_dir = d
+                break
+
     if not jars:
-        # fallback to mcp/jars
-        jars = list(pathlib.Path("mcp/jars").glob("*.jar"))
-    if not jars:
-        raise RuntimeError(f"No jars found in {jar_dir}")
+        raise RuntimeError(f"No jars found in candidate directories: {[str(d) for d in candidate_dirs]}")
+
     jpype.startJVM(classpath=[str(j) for j in jars])
     _jvm_started = True
-
 def _parse_sql_value(raw: str) -> Any:
     raw = raw.strip()
     if raw.upper() == "NULL":

@@ -104,7 +104,7 @@ stylesheet. Fortunately, showdown accepts <a> elements inside markdown code.
             <xsl:copy-of select="$processed_prefix"/>
             <xsl:value-of select="$prefix_space"/>
         </xsl:if>
-        <xsl:apply-templates select="$node" mode="markdown"/>
+        <xsl:apply-templates select="msxsl:node-set($node)" mode="markdown"/>
         <xsl:if test="$postfix">
             <xsl:value-of select="$postfix_space"/>
             <xsl:copy-of select="$processed_postfix"/>
