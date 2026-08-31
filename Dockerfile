@@ -30,13 +30,13 @@ ENV UV_SYSTEM_PYTHON=1 \
 
 WORKDIR /app/mcp
 
-# deps layer — context is mcp/ (README needed for hatchling readme validation)
+# deps layer — context is mcp/ (cache deps without project build)
 COPY pyproject.toml uv.lock README.md ./
-
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # source + vendored assets (xml/xslt/base already inside mcp/ if vendored)
 COPY . ./
+RUN uv sync --frozen --no-dev
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
