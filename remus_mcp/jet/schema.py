@@ -6,10 +6,8 @@ from __future__ import annotations
 # Table names are Jet names exactly as seen via mdb-tables.
 ENTITY_TABLES: dict[str, str] = {
     "Section": "section",
-    "Appendix": "appendix",
     "Paragraph": "paragraph",
     "GraphicFile": "graphic_file",
-    "GlossaryItem": "glossary_item",
     "Organization": "organization",
     "Stakeholder": "stakeholder",
     "Meeting": "meeting",
@@ -88,8 +86,8 @@ for _tbl, _typ in ENTITY_TABLES.items():
     # keep first table for each type (prefer canonical)
     if _typ not in TYPE_TO_TABLE:
         TYPE_TO_TABLE[_typ] = _tbl
-# Ensure traceability_matrix alias not colliding: TraceabilityMatrix is primary
-# Add alias for plural? Already handled.
+TYPE_TO_TABLE["appendix"] = "Section"
+TYPE_TO_TABLE["glossary_item"] = "Paragraph"
 
 TABLE_TO_TYPE: dict[str, str] = {k: v for k, v in ENTITY_TABLES.items()}
 
@@ -116,33 +114,33 @@ WRITABLE_TYPES: set[str] = {
 REQUIRED_FIELDS: dict[str, list[str]] = {
     "section": ["name"],
     "appendix": ["name"],
-    "paragraph": ["name"],
-    "graphic_file": ["name"],
-    "glossary_item": ["name"],
+    "paragraph": ["name", "text"],
+    "graphic_file": ["name", "fileName"],
+    "glossary_item": ["name", "text"],
     "organization": ["name"],
-    "stakeholder": ["name"],
-    "meeting": ["name"],
-    "objective": ["name"],
-    "actor": ["name"],
-    "information_requirement": ["name"],
-    "constraint_requirement": ["name"],
-    "use_case": ["name"],
-    "functional_requirement": ["name"],
-    "non_functional_requirement": ["name"],
-    "object_type": ["name"],
-    "user_defined_value_type": ["name"],
-    "association_type": ["name"],
-    "system_operation": ["name"],
-    "alternative": [],
-    "conflict": ["name"],
-    "defect": ["name"],
-    "change_request": ["name"],
+    "stakeholder": ["name", "role"],
+    "meeting": ["name", "place", "results"],
+    "objective": ["name", "description"],
+    "actor": ["name", "role"],
+    "information_requirement": ["name", "relevantConcept"],
+    "constraint_requirement": ["name", "description"],
+    "use_case": ["name", "description"],
+    "functional_requirement": ["name", "description"],
+    "non_functional_requirement": ["name", "description"],
+    "object_type": ["name", "description"],
+    "user_defined_value_type": ["name", "description"],
+    "association_type": ["name", "description"],
+    "system_operation": ["name", "description"],
+    "alternative": ["description"],
+    "conflict": ["name", "description", "solution"],
+    "defect": ["name", "description", "solution"],
+    "change_request": ["name", "description", "analysis"],
     "traceability_matrix": ["name"],
     "trace": ["source", "target"],
-    "attribute": ["name"],
-    "component": ["name"],
-    "role": ["name"],
-    "parameter": ["name"],
+    "attribute": ["name", "description"],
+    "component": ["name", "description"],
+    "role": ["name", "description"],
+    "parameter": ["name", "description"],
     "invariant_expression": [],
     "step": [],
     "c_requirements_specification": ["name"],

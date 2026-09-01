@@ -36,7 +36,7 @@ def _make_doc_project(tmp_path, name="src.rem"):
             "stability": 1,
         },
     )
-    crud.rem_create(sm, pid, "actor", {"name": "Synthetic Actor", "description": "actor for xml"})
+    crud.rem_create(sm, pid, "actor", {"name": "Synthetic Actor", "role": "actor for xml"})
     return sm, pid, str(dst)
 
 

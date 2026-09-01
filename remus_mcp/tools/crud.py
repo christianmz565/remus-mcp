@@ -111,6 +111,9 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
         # Copy supplied data
         for k, v in data.items():
             row[k] = v
+        # Default text fields to avoid NULLs
+        if "comments" not in row or row["comments"] is None:
+            row["comments"] = "Ninguno"
         # Auto version
         if "versionMajor" not in row or row["versionMajor"] is None:
             row["versionMajor"] = 1
@@ -127,10 +130,27 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
                     row["document"] = int(c_specs[0]["oid"])
                 else:
                     row["document"] = 1
-            if type in ("functional_requirement", "non_functional_requirement", "information_requirement", "constraint_requirement", "use_case", "objective"):
+            if type in ("functional_requirement", "non_functional_requirement", "information_requirement", "constraint_requirement", "use_case", "objective", "conflict", "defect", "change_request"):
                 for fk_col in ("importance", "urgency", "status", "stability"):
+                    if fk_col == "stability" and type in ("conflict", "defect", "change_request"):
+                        continue
                     if fk_col not in row or row[fk_col] is None:
                         row[fk_col] = 1
+            if type == "appendix":
+                row["isAppendix"] = 1
+            elif type == "section" and "isAppendix" not in row:
+                row["isAppendix"] = 0
+            if type == "glossary_item":
+                row["isGlossaryItem"] = 1
+            elif type == "paragraph" and "isGlossaryItem" not in row:
+                row["isGlossaryItem"] = 0
+            if type == "stakeholder":
+                for b_col in ("isCustomer", "isDeveloper", "isUser"):
+                    if b_col not in row or row[b_col] is None:
+                        row[b_col] = 0
+            if type == "defect":
+                if "defectType" not in row or row["defectType"] is None:
+                    row["defectType"] = 1
             if type == "use_case":
                 if "frequencyTime" not in row or row["frequencyTime"] is None:
                     row["frequencyTime"] = 1

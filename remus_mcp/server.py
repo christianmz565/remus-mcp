@@ -83,27 +83,114 @@ def create_server(session_manager: SessionManager) -> Server:
             ),
             Tool(
                 name="rem_create",
-                description="Create entity",
+                description=(
+                    "Create a REM entity. The 'data' object must include required fields for the specified type:\n"
+                    "- actor: name (req), role (req), comments\n"
+                    "- stakeholder: name (req), role (req), comments, organization, isCustomer, isDeveloper, isUser\n"
+                    "- information_requirement: name (req), relevantConcept (req), comments, importance, urgency, status, stability\n"
+                    "- functional_requirement: name (req), description (req), comments, importance, urgency, status, stability\n"
+                    "- non_functional_requirement: name (req), description (req), comments, importance, urgency, status, stability\n"
+                    "- constraint_requirement: name (req), description (req), comments, importance, urgency, status, stability\n"
+                    "- objective: name (req), description (req), comments, importance, urgency, status, stability\n"
+                    "- use_case: name (req), description (req), triggeringEvent, precondition, postcondition, comments, importance, urgency, status, stability\n"
+                    "- organization: name (req), address, telephone, fax, comments\n"
+                    "- meeting: name (req), place (req), results (req), date, comments\n"
+                    "- conflict: name (req), description (req), solution (req), comments\n"
+                    "- defect: name (req), description (req), solution (req), comments\n"
+                    "- change_request: name (req), description (req), analysis (req), comments\n"
+                    "- section / appendix: name (req), isAppendix, comments\n"
+                    "- paragraph / glossary_item: name (req), text (req), comments\n"
+                    "- object_type / association_type / user_defined_value_type / system_operation: name (req), description (req), stereotype, comments\n"
+                    "- attribute / component / role / parameter: name (req), description (req), comments"
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "project_id": {"type": "string"},
                         "type": {"type": "string", "enum": REM_TYPE_VALUES},
-                        "data": {"type": "object"},
+                        "data": {
+                            "type": "object",
+                            "description": "Payload dictionary with required and optional fields for the entity type.",
+                            "properties": {
+                                "name": {"type": "string", "description": "Entity code/name (e.g. 'ACT-01: Directora')"},
+                                "description": {"type": "string", "description": "Detailed description for requirements, objectives, use cases, types, defects, conflicts"},
+                                "role": {"type": "string", "description": "Role representation for actor or stakeholder (required for actor/stakeholder)"},
+                                "relevantConcept": {"type": "string", "description": "Concept representation for information requirement (required for information_requirement)"},
+                                "text": {"type": "string", "description": "Text content for paragraph or glossary_item (required for paragraph/glossary_item)"},
+                                "fileName": {"type": "string", "description": "File name for graphic_file (required for graphic_file)"},
+                                "place": {"type": "string", "description": "Place for meeting (required for meeting)"},
+                                "results": {"type": "string", "description": "Results for meeting (required for meeting)"},
+                                "solution": {"type": "string", "description": "Solution for defect or conflict (required for defect/conflict)"},
+                                "analysis": {"type": "string", "description": "Analysis for change_request (required for change_request)"},
+                                "comments": {"type": "string", "description": "Optional comments (defaults to 'Ninguno')"},
+                                "address": {"type": "string", "description": "Address for organization"},
+                                "telephone": {"type": "string", "description": "Telephone for organization"},
+                                "fax": {"type": "string", "description": "Fax for organization"},
+                                "organization": {"type": "integer", "description": "Organization OID for stakeholder"},
+                                "isCustomer": {"type": "boolean", "description": "Flag if stakeholder is customer"},
+                                "isDeveloper": {"type": "boolean", "description": "Flag if stakeholder is developer"},
+                                "isUser": {"type": "boolean", "description": "Flag if stakeholder is user"},
+                                "triggeringEvent": {"type": "string", "description": "Triggering event for use_case"},
+                                "precondition": {"type": "string", "description": "Precondition for use_case"},
+                                "postcondition": {"type": "string", "description": "Postcondition for use_case"},
+                                "stereotype": {"type": "string", "description": "Stereotype for object_type, association_type, user_defined_value_type, system_operation"},
+                                "definition": {"type": "string", "description": "Definition for user_defined_value_type"},
+                                "resultType": {"type": "string", "description": "Result type for system_operation"},
+                                "defectType": {"type": "integer", "description": "Defect type ID for defect"},
+                                "importance": {"type": "integer", "description": "Importance rating (1=PD, 2=vital, 3=importante, 4=quedaría bien)"},
+                                "urgency": {"type": "integer", "description": "Urgency rating (1=PD, 2=inmediatamente, 3=hay presión, 4=puede esperar)"},
+                                "status": {"type": "integer", "description": "Status (1=PD, 2=en construcción, 3=pendiente de verificación, 4=pendiente de validación, 5=validado)"},
+                                "stability": {"type": "integer", "description": "Stability (1=PD, 2=baja, 3=media, 4=alta)"},
+                            },
+                        },
                     },
                     "required": ["project_id", "type", "data"],
                 },
             ),
             Tool(
                 name="rem_update",
-                description="Update entity",
+                description="Update fields of an existing REM entity",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "project_id": {"type": "string"},
                         "type": {"type": "string", "enum": REM_TYPE_VALUES},
                         "oid": {"type": "integer"},
-                        "patch": {"type": "object"},
+                        "patch": {
+                            "type": "object",
+                            "description": "Partial entity fields to update",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "description": {"type": "string"},
+                                "role": {"type": "string"},
+                                "relevantConcept": {"type": "string"},
+                                "text": {"type": "string"},
+                                "fileName": {"type": "string"},
+                                "place": {"type": "string"},
+                                "results": {"type": "string"},
+                                "solution": {"type": "string"},
+                                "analysis": {"type": "string"},
+                                "comments": {"type": "string"},
+                                "address": {"type": "string"},
+                                "telephone": {"type": "string"},
+                                "fax": {"type": "string"},
+                                "organization": {"type": "integer"},
+                                "isCustomer": {"type": "boolean"},
+                                "isDeveloper": {"type": "boolean"},
+                                "isUser": {"type": "boolean"},
+                                "triggeringEvent": {"type": "string"},
+                                "precondition": {"type": "string"},
+                                "postcondition": {"type": "string"},
+                                "stereotype": {"type": "string"},
+                                "definition": {"type": "string"},
+                                "resultType": {"type": "string"},
+                                "defectType": {"type": "integer"},
+                                "importance": {"type": "integer"},
+                                "urgency": {"type": "integer"},
+                                "status": {"type": "integer"},
+                                "stability": {"type": "integer"},
+                            },
+                        },
                     },
                     "required": ["project_id", "type", "oid", "patch"],
                 },
