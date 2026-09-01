@@ -12,13 +12,10 @@ def _ensure_exists(session_manager, project_id: str, oid: int) -> bool:
     # Search all entity tables for oid existence
     session = session_manager.get(project_id)
     for table in TYPE_TO_TABLE.values():
-        try:
-            rows = export_table(str(session.db_path), table)
-            for r in rows:
-                if int(r.get("oid", -1) or -1) == int(oid):
-                    return True
-        except Exception:
-            continue
+        rows = export_table(str(session.db_path), table)
+        for r in rows:
+            if int(r.get("oid", -1) or -1) == int(oid):
+                return True
     return False
 
 
@@ -29,14 +26,11 @@ def trace_add(
         sess = session_manager.get(project_id)
         tables_for_oid = []
         for tbl in TYPE_TO_TABLE.values():
-            try:
-                rows = export_table(str(sess.db_path), tbl)
-                for r in rows:
-                    if int(r.get("oid", -1) or -1) == int(source_oid):
-                        tables_for_oid.append(tbl)
-                        break
-            except Exception:
-                pass
+            rows = export_table(str(sess.db_path), tbl)
+            for r in rows:
+                if int(r.get("oid", -1) or -1) == int(source_oid):
+                    tables_for_oid.append(tbl)
+                    break
             if len(tables_for_oid) > 1:
                 break
         if len(tables_for_oid) == 1:
@@ -57,20 +51,17 @@ def trace_add(
     with session_manager.mutate(project_id, "trace_add", "trace", None):
         sess3 = session_manager.get(project_id)
         new_oid = max_oid(str(sess3.db_path), "Trace") + 1
-        row = {"oid": new_oid, "source": int(source_oid), "target": int(target_oid)}
-        if traces and len(traces) > 0:
-            sample = traces[0]
-            if "isChecked" in sample:
-                row["isChecked"] = 1 if checked else 0
-            elif "checked" in sample:
-                row["checked"] = 1 if checked else 0
-        else:
-            row["isChecked"] = 1 if checked else 0
+        row = {
+            "oid": new_oid,
+            "source": int(source_oid),
+            "target": int(target_oid),
+            "isChecked": 1 if checked else 0,
+        }
         cols = ", ".join(f"[{k}]" for k in row)
         vals = ", ".join(sql_escape(v) for v in row.values())
         sql = f"INSERT INTO [Trace] ({cols}) VALUES ({vals})"
         execute_sql(str(sess3.db_path), sql)
-        session_manager.append_change(project_id, "trace_add", new_oid, "trace")
+        session_manager.append_change(project_id, "trace_add", new_oid, "trace", "C")
         return {"trace_oid": new_oid, "project_id": project_id}
 
 
@@ -91,7 +82,7 @@ def trace_remove(
     with session_manager.mutate(project_id, "trace_remove", "trace", None):
         oid = int(found.get("oid"))
         execute_sql(str(session.db_path), f"DELETE FROM [Trace] WHERE [oid]={oid}")
-        session_manager.append_change(project_id, "trace_remove", oid, "trace")
+        session_manager.append_change(project_id, "trace_remove", oid, "trace", "D")
         return {"deleted": True, "project_id": project_id, "oid": oid}
 
 

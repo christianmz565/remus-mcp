@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .jet.schema import DOC_SPEC_TYPES, SPEC_OBJECT_TYPES, VALID_CHANGE_OP_TYPES
 from .config import resolve_project_path
 from .jet.mdbtools import (
     JetWriteNotSupported,
@@ -158,57 +159,54 @@ class SessionManager:
             def __exit__(inner_self, exc_type, exc, tb):
                 if exc_type is not None:
                     # On error, restore backup
-                    try:
-                        shutil.copy2(inner_self.backup, session.db_path)
-                    except Exception:
-                        pass
+                    shutil.copy2(inner_self.backup, session.db_path)
                 self._release_lock(session)
                 return False
 
         return Ctx()
 
     def append_change(
-        self, project_id: str, tool_name: str, subject_oid: int | None, subject_type: str | None
-    ):
+        self,
+        project_id: str,
+        tool_name: str,
+        subject_oid: int | None,
+        entity_type: str | None,
+        op_type: str = "U",
+    ) -> None:
+        if op_type not in VALID_CHANGE_OP_TYPES:
+            raise ValueError(f"Invalid operation type: {op_type}")
+
+        if subject_oid is None or subject_oid <= 0:
+            raise ValueError(f"Invalid subject_oid: {subject_oid}")
+
+        if not entity_type:
+            raise ValueError("entity_type is required")
+
+        if entity_type in DOC_SPEC_TYPES:
+            subject_type_code = "D"
+        elif entity_type in SPEC_OBJECT_TYPES:
+            subject_type_code = "O"
+        else:
+            # Non-specification entities (traces, join tables) are not logged in Change table
+            return
+
         session = self.get(project_id)
-        try:
-            # Determine Change table max oid
-            oid = max_oid(str(session.db_path), "Change") + 1
-            # need to map subjectType to code? Use simple int or type string length? Check schema: Change.subjectType maybe int?
-            # Let's inspect via export_table first row to infer type. For now use string hash or 0 if unknown.
-            # Try to get type_code from mapping: keep as string representation insert as text if column is Text else int.
-            # We'll try to insert with quoted values and let mdb-sql handle.
-            import datetime
+        oid = max_oid(str(session.db_path), "Change") + 1
 
-            now = datetime.datetime.now()
-            # Jet date format: #mm/dd/yyyy hh:nn:ss# ? mdb-sql expects 'YYYY-MM-DD HH:MM:SS' ?
-            # Use now isoformat as string
-            date_str = now.strftime("%Y-%m-%d %H:%M:%S")
-            # subjectType: try to store as string if column text else 0. We'll use sql_escape for string.
-            # Determine if we can query Change schema via python? Just try insert with numeric 0 for subjectType if string fails.
-            desc = f"MCP: {tool_name} by agent"
-            # Attempt SQL
-            # Change columns: oid, date, type, subject, subjectType, description ? Check schema later; assume these.
-            sql = f"INSERT INTO [Change] ([oid], [date], [type], [subject], [subjectType], [description]) VALUES ({oid}, {sql_escape(date_str)}, {sql_escape('M')}, {subject_oid or 0}, {sql_escape(subject_type or '')}, {sql_escape(desc)})"
-            try:
-                execute_sql(str(session.db_path), sql)
-            except JetWriteNotSupported:
-                # fallback: ignore change log if write not supported (mdb-sql missing)
-                pass
-            except Exception:
-                # If column names mismatch, ignore
-                # e.g., subjectType may be integer column: try numeric fallback
-                try:
-                    sql2 = f"INSERT INTO [Change] ([oid], [date], [type], [subject], [description]) VALUES ({oid}, {sql_escape(date_str)}, {sql_escape('M')}, {subject_oid or 0}, {sql_escape(desc)})"
-                    execute_sql(str(session.db_path), sql2)
-                except Exception:
-                    pass
-            # Push undo
-            if session.backup_path is not None:
-                session.undo_stack.append((project_id, session.backup_path, oid))
-        except Exception:
-            pass
+        import datetime
 
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        desc = f"MCP: {tool_name} by agent"
+
+        sql = (
+            f"INSERT INTO [Change] ([oid], [date], [type], [subject], [subjectType], [description]) "
+            f"VALUES ({oid}, {sql_escape(date_str)}, {sql_escape(op_type)}, {subject_oid}, {sql_escape(subject_type_code)}, {sql_escape(desc)})"
+        )
+        execute_sql(str(session.db_path), sql)
+
+        if session.backup_path is not None:
+            session.undo_stack.append((project_id, session.backup_path, oid))
     def undo_last(self, project_id: str) -> dict[str, Any]:
         session = self.get(project_id)
         if not session.undo_stack:
@@ -221,10 +219,7 @@ class SessionManager:
         try:
             shutil.copy2(backup_path, session.db_path)
             # Delete Change row if exists
-            try:
-                execute_sql(str(session.db_path), f"DELETE FROM [Change] WHERE [oid]={change_oid}")
-            except Exception:
-                pass
+            execute_sql(str(session.db_path), f"DELETE FROM [Change] WHERE [oid]={change_oid}")
         finally:
             self._release_lock(session)
         return {"restored": True, "backup": str(backup_path), "change_oid": change_oid}

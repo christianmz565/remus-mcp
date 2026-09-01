@@ -41,7 +41,7 @@ def get_dtd_path() -> Path:
 
 def get_jars_dir() -> Path:
     """Return deterministic path to jars directory."""
-    jars_env = os.environ.get(ENV_JARS_DIR) or os.environ.get("JACKCESS_JARS_DIR")
+    jars_env = os.environ.get(ENV_JARS_DIR)
     if jars_env:
         path = Path(jars_env)
     else:
@@ -84,14 +84,12 @@ def get_xsl_path(lang: str) -> Path:
         path = REPO_ROOT / "xslt" / "remus" / filename
     if not path.exists():
         raise FileNotFoundError(f"XSL stylesheet not found: {path}")
-
+    return path
 
 def get_data_dir() -> Path:
     """Return path to data directory for storing projects."""
     if os.environ.get(ENV_DATA_DIR):
         path = Path(os.environ[ENV_DATA_DIR])
-    elif Path("/data").exists() and Path("/data").is_dir():
-        path = Path("/data")
     else:
         path = REPO_ROOT / "data"
     path.mkdir(parents=True, exist_ok=True)
@@ -103,5 +101,4 @@ def resolve_project_path(target_path: str) -> Path:
     path = Path(target_path)
     if not path.is_absolute():
         path = get_data_dir() / path
-    return path
     return path

@@ -24,7 +24,9 @@ def test_project_create(tmp_path):
 def test_exception_code_formatting_server():
     sm = SessionManager()
     server = create_server(sm)
-    target = pathlib.Path("base/remus_base_empty_english.rem")
+    from conftest import find_base
+
+    target = find_base("english")
     pid = sm.open_project(str(target))
 
     # Call tool handlers directly via call_tool

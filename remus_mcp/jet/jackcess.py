@@ -24,29 +24,11 @@ def _ensure_jvm():
         _jvm_started = True
         return
 
-    # Auto-detect JAVA_HOME if unset but java executable is in PATH
     if "JAVA_HOME" not in os.environ:
         java_bin = shutil.which("java")
         if java_bin:
             java_path = pathlib.Path(java_bin).resolve()
-            # Common layouts: <jdk>/bin/java -> <jdk> or <jdk>/lib/openjdk/bin/java -> <jdk>/lib/openjdk
-            parent = java_path.parent.parent
-            if (parent / "lib" / "server" / "libjvm.so").exists() or (
-                parent / "lib" / "libjvm.so"
-            ).exists():
-                os.environ["JAVA_HOME"] = str(parent)
-            elif (parent / "lib" / "openjdk" / "lib" / "server" / "libjvm.so").exists():
-                os.environ["JAVA_HOME"] = str(parent / "lib" / "openjdk")
-            elif parent.parent.name == "store":
-                # Nix store layout search
-                for candidate in parent.glob("**/libjvm.so"):
-                    os.environ["JAVA_HOME"] = str(
-                        candidate.parent.parent.parent
-                        if candidate.parent.name == "server"
-                        else candidate.parent.parent
-                    )
-                    break
-
+            os.environ["JAVA_HOME"] = str(java_path.parent.parent)
     jars_dir = get_jars_dir()
     jars = list(jars_dir.glob("*.jar"))
     if not jars:
@@ -90,8 +72,18 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
     HashMap = JClass("java.util.HashMap")
     # Date handling
     SimpleDateFormat = JClass("java.text.SimpleDateFormat")
-    sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    sdf1 = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
     sdf2 = SimpleDateFormat("yyyy-MM-dd")
+    sdf3 = SimpleDateFormat("dd/MM/yy HH:mm:ss")
+    sdf4 = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+
+    def _to_date(val_str: str):
+        for fmt in (sdf1, sdf2, sdf3, sdf4):
+            try:
+                return fmt.parse(val_str)
+            except Exception:
+                pass
+        raise ValueError(f"Invalid date format '{val_str}'")
     # Open DB
     db = DBB.open(File(db_path))
     try:
@@ -125,104 +117,11 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                 v = _parse_sql_value(val_raw)
                 # Convert date columns
                 if col.lower() in ("versiondate", "date") and isinstance(v, str):
-                    try:
-                        date_obj = sdf.parse(v)
-                        v = date_obj
-                    except Exception:
-                        try:
-                            date_obj = sdf2.parse(v)
-                            v = date_obj
-                        except Exception:
-                            pass
+                    v = _to_date(v)
                 if col.lower() in ("ischecked", "checked") and isinstance(v, int):
                     v = jpype.JBoolean(bool(v))
                 hm.put(col, v)
-            # Proactively fill FK value columns that are missing to avoid 0 FK violations
-            for col_obj in tbl.getColumns():
-                col_name = str(col_obj.getName())
-                if hm.containsKey(col_name):
-                    continue
-                lname = col_name.lower()
-                # FK to value tables: set to 1 if missing
-                if lname in (
-                    "importance",
-                    "urgency",
-                    "status",
-                    "stability",
-                    "avglifetimetime",
-                    "maxlifetimetime",
-                    "frequencytime",
-                    "timeunit",
-                    "timeunitvalue",
-                    "termination",
-                    "defectstatus",
-                    "defecttype",
-                    "changeRequestStatus",
-                    "conflictstatus",
-                    "ischecked",
-                ):
-                    # Check if column type is integer-like
-                    col_type = str(col_obj.getType()).lower()
-                    if "int" in col_type or "long" in col_type:
-                        hm.put(col_name, jpype.JInt(1))
-                    elif "boolean" in col_type:
-                        hm.put(col_name, jpype.JBoolean(False))
-            # Try insert with retry for multiple missing required columns
-            attempts = 0
-            while True:
-                try:
-                    tbl.addRowFromMap(hm)
-                    break
-                except Exception as e:
-                    msg = str(e)
-                    m = re.search(r"Column=([^\s\)]+)", msg)
-                    if m and "missing value for required column" in msg.lower() and attempts < 5:
-                        col_missing = m.group(1).strip(" ;")
-                        try:
-                            col_obj = tbl.getColumn(col_missing)
-                        except Exception:
-                            col_obj = None
-                        if col_obj is not None:
-                            col_type = str(col_obj.getType()).lower()
-                            lname = col_missing.lower()
-                            if lname in (
-                                "isuser",
-                                "iscustomer",
-                                "isdeveloper",
-                                "isabstract",
-                                "ischecked",
-                                "isorderedbyname",
-                                "isappendix",
-                            ):
-                                hm.put(col_missing, jpype.JBoolean(False))
-                            elif "date" in lname:
-                                hm.put(col_missing, JClass("java.util.Date")())
-                            elif "boolean" in col_type:
-                                hm.put(col_missing, jpype.JBoolean(False))
-                            elif "text" in col_type or "memo" in col_type:
-                                hm.put(col_missing, "")
-                            elif "int" in col_type or "long" in col_type:
-                                if lname in (
-                                    "importance",
-                                    "urgency",
-                                    "status",
-                                    "stability",
-                                    "frequencytime",
-                                    "maxlifetimetime",
-                                    "avglifetimetime",
-                                    "termination",
-                                    "timeunitvalue",
-                                ):
-                                    hm.put(col_missing, jpype.JInt(1))
-                                else:
-                                    hm.put(col_missing, jpype.JInt(0))
-                            else:
-                                hm.put(col_missing, None)
-                            attempts += 1
-                            continue
-                    raise
-                else:
-                    raise
+            tbl.addRowFromMap(hm)
             db.flush()
         elif sql_stripped.upper().startswith("UPDATE"):
             m = re.match(
@@ -248,26 +147,17 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
                 val_raw = km.group(2).strip()
                 v = _parse_sql_value(val_raw)
                 if col.lower() in ("versiondate", "date") and isinstance(v, str):
-                    try:
-                        v = sdf.parse(v)
-                    except Exception:
-                        try:
-                            v = sdf2.parse(v)
-                        except Exception:
-                            pass
+                    v = _to_date(v)
                 patches[col] = v
             # Find row by oid via cursor
             cursor = tbl.getDefaultCursor()
             row = cursor.getNextRow()
             found = None
             while row is not None:
-                try:
-                    oid_val = row.get("oid")
-                    if oid_val is not None and int(str(oid_val)) == oid:
-                        found = row
-                        break
-                except Exception:
-                    pass
+                oid_val = row.get("oid")
+                if oid_val is not None and int(str(oid_val)) == oid:
+                    found = row
+                    break
                 row = cursor.getNextRow()
             if found is None:
                 raise KeyError(f"Row oid {oid} not found in {table}")
@@ -311,20 +201,14 @@ def execute_sql_via_jackcess(db_path: str, sql: str):
             row = cursor.getNextRow()
             found = None
             while row is not None:
-                try:
-                    oid_val = row.get("oid")
-                    if oid_val is not None and int(str(oid_val)) == oid:
-                        found = row
-                        break
-                except Exception:
-                    pass
+                oid_val = row.get("oid")
+                if oid_val is not None and int(str(oid_val)) == oid:
+                    found = row
+                    break
                 row = cursor.getNextRow()
             if found is not None:
                 tbl.deleteRow(found)
                 db.flush()
-            else:
-                # No row, ignore?
-                pass
         else:
             raise ValueError(f"Unsupported SQL via jackcess: {sql[:100]}")
     finally:

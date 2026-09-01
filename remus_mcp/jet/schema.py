@@ -47,6 +47,40 @@ ENTITY_TABLES: dict[str, str] = {
     "IsPreparedFor": "is_prepared_for",
     "IsPreparedBy": "is_prepared_by",
 }
+DOC_SPEC_TYPES: frozenset[str] = frozenset({
+    "c_requirements_specification",
+    "d_requirements_specification",
+    "defects_specification",
+    "change_requests_specification",
+})
+
+SPEC_OBJECT_TYPES: frozenset[str] = frozenset({
+    "section",
+    "appendix",
+    "paragraph",
+    "graphic_file",
+    "glossary_item",
+    "organization",
+    "stakeholder",
+    "meeting",
+    "objective",
+    "actor",
+    "information_requirement",
+    "constraint_requirement",
+    "use_case",
+    "functional_requirement",
+    "non_functional_requirement",
+    "object_type",
+    "user_defined_value_type",
+    "association_type",
+    "system_operation",
+    "conflict",
+    "defect",
+    "change_request",
+    "traceability_matrix",
+})
+
+VALID_CHANGE_OP_TYPES: frozenset[str] = frozenset({"C", "U", "D", "S"})
 
 # Reverse
 TYPE_TO_TABLE: dict[str, str] = {}
@@ -115,6 +149,9 @@ REQUIRED_FIELDS: dict[str, list[str]] = {
     "d_requirements_specification": ["name"],
     "defects_specification": ["name"],
     "change_requests_specification": ["name"],
+    "is_prepared_for": ["document", "organization"],
+    "is_prepared_by": ["document", "organization"],
+    "is_author_of": ["stakeholder", "specificationObject"],
 }
 
 # Ordered list for RemType enum values (excluding doc specs and internals)
@@ -155,5 +192,8 @@ REM_TYPE_VALUES: list[str] = sorted(
         "d_requirements_specification",
         "defects_specification",
         "change_requests_specification",
+        "is_prepared_for",
+        "is_prepared_by",
+        "is_author_of",
     ]
 )

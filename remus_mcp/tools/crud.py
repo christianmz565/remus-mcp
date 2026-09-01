@@ -6,9 +6,8 @@ from typing import Any
 
 from ..config import DEFAULT_LIMIT, MAX_LIMIT
 from ..jet.mdbtools import JetWriteNotSupported, execute_sql, export_table, max_oid, sql_escape
-from ..jet.schema import TYPE_TO_TABLE
+from ..jet.schema import SPEC_OBJECT_TYPES, TYPE_TO_TABLE
 from ..validation import validate_create, validate_update
-
 
 def _ensure_type(type_name: str):
     if type_name not in TYPE_TO_TABLE:
@@ -121,13 +120,33 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
             import datetime
 
             row["versionDate"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if type in SPEC_OBJECT_TYPES:
+            if "document" not in row or row["document"] is None:
+                c_specs = export_table(str(session.db_path), "C_RequirementsSpecification")
+                if c_specs and "oid" in c_specs[0]:
+                    row["document"] = int(c_specs[0]["oid"])
+                else:
+                    row["document"] = 1
+            if type in ("functional_requirement", "non_functional_requirement", "information_requirement", "constraint_requirement", "use_case", "objective"):
+                for fk_col in ("importance", "urgency", "status", "stability"):
+                    if fk_col not in row or row[fk_col] is None:
+                        row[fk_col] = 1
+            if type == "use_case":
+                if "frequencyTime" not in row or row["frequencyTime"] is None:
+                    row["frequencyTime"] = 1
+            elif type == "information_requirement":
+                if "avgLifeTimeTime" not in row or row["avgLifeTimeTime"] is None:
+                    row["avgLifeTimeTime"] = 1
+                if "maxLifeTimeTime" not in row or row["maxLifeTimeTime"] is None:
+                    row["maxLifeTimeTime"] = 1
+        if "number" not in row or row["number"] is None or row["number"] == 0:
+            row["number"] = new_oid
         # Auto order
         if "order" not in row or row["order"] is None:
             try:
                 rows = export_table(str(session.db_path), table)
                 max_order = 0
                 for r in rows:
-                    # filter by parent/document if applicable
                     if "parent" in data and data.get("parent") is not None:
                         if r.get("parent") != data.get("parent"):
                             continue
@@ -135,15 +154,14 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
                         if r.get("document") != data.get("document"):
                             continue
                     try:
-                        o = int(r.get("order") or 0)
-                        max_order = max(max_order, o)
-                    except:
+                        o = int(r.get("order", 0) or 0)
+                        if o > max_order:
+                            max_order = o
+                    except Exception:
                         pass
                 row["order"] = max_order + 1
             except Exception:
                 row["order"] = 1
-        # For columns not in schema, let DB handle; but we should ensure required defaults
-        # Execute
         sql = _build_insert_sql(table, row)
         try:
             execute_sql(str(session.db_path), sql)
@@ -151,7 +169,7 @@ def rem_create(session_manager, project_id: str, type: str, data: dict[str, Any]
             raise RuntimeError(f"Jet write not supported (need jackcess fallback): {e}")
         except Exception as e:
             raise RuntimeError(f"INSERT failed: {e} sql={sql[:500]}")
-        session_manager.append_change(project_id, "rem_create", new_oid, type)
+        session_manager.append_change(project_id, "rem_create", new_oid, type, "C")
         # Read back
         rows2 = export_table(str(session.db_path), table)
         for r in rows2:
@@ -197,7 +215,7 @@ def rem_update(
             raise RuntimeError(f"Jet write not supported: {e}")
         except Exception as e:
             raise RuntimeError(f"UPDATE failed: {e} sql={sql[:500]}")
-        session_manager.append_change(project_id, "rem_update", oid, type)
+        session_manager.append_change(project_id, "rem_update", oid, type, "U")
         rows2 = export_table(str(session.db_path), table)
         for r in rows2:
             if int(r.get("oid", -1)) == int(oid):
@@ -260,13 +278,10 @@ def rem_delete(
         if cascade and refs:
             for ref in refs:
                 if ref["table"] == "Trace":
-                    try:
-                        execute_sql(
-                            str(session.db_path),
-                            f"DELETE FROM [Trace] WHERE [oid]={int(ref['oid'])}",
-                        )
-                    except Exception:
-                        pass
+                    execute_sql(
+                        str(session.db_path),
+                        f"DELETE FROM [Trace] WHERE [oid]={int(ref['oid'])}",
+                    )
         sql = f"DELETE FROM [{table}] WHERE [oid]={int(oid)}"
         try:
             execute_sql(str(session.db_path), sql)
@@ -274,7 +289,7 @@ def rem_delete(
             raise RuntimeError(f"Jet write not supported: {e}")
         except Exception as e:
             raise RuntimeError(f"DELETE failed: {e}")
-        session_manager.append_change(project_id, "rem_delete", oid, type)
+        session_manager.append_change(project_id, "rem_delete", oid, type, "D")
         return {
             "deleted": 1,
             "project_id": project_id,

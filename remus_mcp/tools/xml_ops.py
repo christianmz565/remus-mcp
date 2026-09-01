@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
-from typing import Any
 
 from lxml import etree
 
@@ -49,7 +49,47 @@ TYPE_TO_XMLTAG = {
 
 XMLTAG_TO_TYPE = {v: k for k, v in TYPE_TO_XMLTAG.items()}
 
+TYPE_PREFIX = {
+    "c_requirementsSpecification": "crs",
+    "d_requirementsSpecification": "drs",
+    "defectsSpecification": "dfs",
+    "changeRequestsSpecification": "crs_spec",
+    "section": "sec",
+    "appendix": "app",
+    "paragraph": "par",
+    "graphic_file": "gfx",
+    "glossary_item": "glo",
+    "organization": "org",
+    "stakeholder": "stk",
+    "meeting": "mtg",
+    "objective": "obj",
+    "actor": "act",
+    "information_requirement": "irq",
+    "constraint_requirement": "crq",
+    "use_case": "uc",
+    "functional_requirement": "frq",
+    "non_functional_requirement": "nfr",
+    "object_type": "obt",
+    "user_defined_value_type": "udt",
+    "association_type": "ast",
+    "system_operation": "sys",
+    "alternative": "alt",
+    "conflict": "cnf",
+    "defect": "def",
+    "change_request": "cr",
+    "traceability_matrix": "mtx",
+    "trace": "trc",
+    "attribute": "att",
+    "component": "cmp",
+    "role": "rol",
+    "parameter": "prm",
+    "step": "stp",
+}
 
+
+def _make_xml_id(type_name: str, oid_int: int) -> str:
+    prefix = TYPE_PREFIX.get(type_name, "id")
+    return f"{prefix}_{oid_int}"
 def _dtd_path() -> str:
     return str(get_dtd_path())
 
@@ -65,11 +105,48 @@ def _create_text_element(parent, tag: str, text: str | None):
 def _parse_oid(oid_s: Any) -> int:
     if oid_s is None:
         raise ValueError("INVALID_OID: None")
+    s = str(oid_s).strip()
+    if not s:
+        raise ValueError("INVALID_OID: Empty string")
+    if "_" in s:
+        s = s.rsplit("_", 1)[-1]
     try:
-        return int(str(oid_s).strip())
-    except Exception as e:
+        return int(s)
+    except ValueError as e:
         raise ValueError(f"INVALID_OID: {oid_s}") from e
 
+
+import datetime
+
+SPEC_TAG_DEFAULT_OIDS = {
+    "c_requirementsSpecification": 1,
+    "d_requirementsSpecification": 2,
+    "defectsSpecification": 3,
+    "changeRequestsSpecification": 4,
+}
+
+
+def _append_date_element(parent_ver, version_date_val: str | None):
+    now = datetime.datetime.now()
+    y_val, m_val, d_val = now.year, now.month, now.day
+    if version_date_val:
+        v_str = str(version_date_val).split()[0]
+        try:
+            dt = datetime.datetime.strptime(v_str, "%Y-%m-%d")
+            y_val, m_val, d_val = dt.year, dt.month, dt.day
+        except ValueError:
+            try:
+                dt = datetime.datetime.strptime(v_str, "%d/%m/%Y")
+                y_val, m_val, d_val = dt.year, dt.month, dt.day
+            except ValueError:
+                pass
+    date_el = etree.SubElement(parent_ver, f"{{{NS}}}date")
+    y = etree.SubElement(date_el, f"{{{NS}}}year")
+    y.text = str(y_val)
+    m = etree.SubElement(date_el, f"{{{NS}}}month")
+    m.text = str(m_val)
+    d = etree.SubElement(date_el, f"{{{NS}}}day")
+    d.text = str(d_val)
 
 def export_xml(
     session_manager,
@@ -101,7 +178,7 @@ def export_xml(
         if rows:
             first = rows[0]
             oid_val = first.get("oid", 1)
-            spec_el.set("oid", str(oid_val))
+            spec_el.set("oid", _make_xml_id(spec_tag, int(oid_val)))
             _create_text_element(spec_el, "name", str(first.get("name", spec_tag)))
             # version
             ver_el = etree.SubElement(spec_el, f"{{{NS}}}version")
@@ -109,49 +186,50 @@ def export_xml(
             major.text = str(first.get("versionMajor", 1) or 1)
             minor = etree.SubElement(ver_el, f"{{{NS}}}minor")
             minor.text = str(first.get("versionMinor", 0) or 0)
-            date_el = etree.SubElement(ver_el, f"{{{NS}}}date")
-            y = etree.SubElement(date_el, f"{{{NS}}}year")
-            y.text = "2024"
-            m = etree.SubElement(date_el, f"{{{NS}}}month")
-            m.text = "1"
-            d = etree.SubElement(date_el, f"{{{NS}}}day")
-            d.text = "1"
+            _append_date_element(ver_el, first.get("versionDate"))
             _create_text_element(
                 spec_el, "comments", str(first.get("comments", "Ninguno") or "Ninguno")
             )
         else:
             # Generate valid ID
-            fallback_oid = (
-                "1"
-                if spec_tag.startswith("c_")
-                else "2"
-                if spec_tag.startswith("d_")
-                else "3"
-                if spec_tag.startswith("defects")
-                else "4"
-            )
-            spec_el.set("oid", fallback_oid)
+            spec_doc_oid = SPEC_TAG_DEFAULT_OIDS.get(spec_tag, 1)
+            spec_el.set("oid", _make_xml_id(spec_tag, spec_doc_oid))
             _create_text_element(spec_el, "name", spec_tag)
             ver_el = etree.SubElement(spec_el, f"{{{NS}}}version")
             major = etree.SubElement(ver_el, f"{{{NS}}}major")
             major.text = "1"
             minor = etree.SubElement(ver_el, f"{{{NS}}}minor")
             minor.text = "0"
-            date_el = etree.SubElement(ver_el, f"{{{NS}}}date")
-            y = etree.SubElement(date_el, f"{{{NS}}}year")
-            y.text = "2024"
-            m = etree.SubElement(date_el, f"{{{NS}}}month")
-            m.text = "1"
-            d = etree.SubElement(date_el, f"{{{NS}}}day")
-            d.text = "1"
+            _append_date_element(ver_el, None)
             _create_text_element(spec_el, "comments", "Ninguno")
-
+        # Export preparedFor / preparedBy for this spec doc
+        doc_oid_int = int(oid_val) if rows else spec_doc_oid
+        pf_rows = export_table(db_path, "IsPreparedFor")
+        pf_org_ids = []
+        for r in pf_rows:
+            if int(r.get("document", -1) or -1) == doc_oid_int:
+                org_id = int(r.get("organization", -1) or -1)
+                if org_id > 0:
+                    pf_org_ids.append(_make_xml_id("organization", org_id))
+        if pf_org_ids:
+            pf_el = etree.SubElement(spec_el, f"{{{NS}}}preparedFor")
+            pf_el.set("organizations", " ".join(pf_org_ids))
+        pb_rows = export_table(db_path, "IsPreparedBy")
+        pb_org_ids = []
+        for r in pb_rows:
+            if int(r.get("document", -1) or -1) == doc_oid_int:
+                org_id = int(r.get("organization", -1) or -1)
+                if org_id > 0:
+                    pb_org_ids.append(_make_xml_id("organization", org_id))
+        if pb_org_ids:
+            pb_el = etree.SubElement(spec_el, f"{{{NS}}}preparedBy")
+            pb_el.set("organizations", " ".join(pb_org_ids))
         # Add entities for this spec if document filter not mismatched - for simplicity add all
         # Determine which types belong? We'll dump all types into first spec? Actually distribute: first spec gets all non-defect/change objects,
         # but for export simplicity we dump all objects into c_requirementsSpecification unless filter.
         if spec_tag == "c_requirementsSpecification":
-            # Add entities
             types_to_export = list(TYPE_TO_XMLTAG.keys())
+            oid_to_xml_id = {}
             if filter_type:
                 types_to_export = [filter_type] if filter_type in types_to_export else []
             for typ in types_to_export:
@@ -182,7 +260,9 @@ def export_xml(
                         oid_int = int(oid_raw) if oid_raw is not None else 0
                     except:
                         oid_int = 0
-                    el.set("oid", str(oid_int))
+                    xml_id = _make_xml_id(typ, oid_int)
+                    el.set("oid", xml_id)
+                    oid_to_xml_id[oid_int] = xml_id
                     _create_text_element(el, "name", str(r.get("name", "")))
                     # version
                     ver2 = etree.SubElement(el, f"{{{NS}}}version")
@@ -190,13 +270,7 @@ def export_xml(
                     ma.text = str(r.get("versionMajor", 1) or 1)
                     mi = etree.SubElement(ver2, f"{{{NS}}}minor")
                     mi.text = str(r.get("versionMinor", 0) or 0)
-                    da = etree.SubElement(ver2, f"{{{NS}}}date")
-                    ye = etree.SubElement(da, f"{{{NS}}}year")
-                    ye.text = "2024"
-                    mo = etree.SubElement(da, f"{{{NS}}}month")
-                    mo.text = "1"
-                    dy = etree.SubElement(da, f"{{{NS}}}day")
-                    dy.text = "1"
+                    _append_date_element(ver2, r.get("versionDate"))
                     # Add comments if present or default for SpecificationObject
                     if r.get("comments") is not None:
                         _create_text_element(el, "comments", str(r.get("comments")))
@@ -232,30 +306,22 @@ def export_xml(
     try:
         traces = export_table(db_path, "Trace")
         for t in traces:
-            oid_raw = t.get("oid")
-            try:
-                oid_int = int(oid_raw) if oid_raw is not None else 0
-            except:
-                oid_int = 0
-            tr_el = etree.SubElement(root, f"{{{NS}}}trace")
-            tr_el.set("oid", str(oid_int))
-            # isChecked
-            if t.get("isChecked") or t.get("checked"):
-                etree.SubElement(tr_el, f"{{{NS}}}isChecked")
-            src_el = etree.SubElement(tr_el, f"{{{NS}}}source")
             src_raw = t.get("source")
-            try:
-                src_int = int(src_raw) if src_raw is not None else 0
-            except:
-                src_int = 0
-            src_el.set("oid", str(src_int))
-            tgt_el = etree.SubElement(tr_el, f"{{{NS}}}target")
             tgt_raw = t.get("target")
             try:
+                src_int = int(src_raw) if src_raw is not None else 0
                 tgt_int = int(tgt_raw) if tgt_raw is not None else 0
-            except:
-                tgt_int = 0
-            tgt_el.set("oid", str(tgt_int))
+            except Exception:
+                continue
+            if not src_int or not tgt_int:
+                continue
+            tr_el = etree.SubElement(root, f"{{{NS}}}trace")
+            src_id = oid_to_xml_id.get(src_int, f"ref_{src_int}")
+            tgt_id = oid_to_xml_id.get(tgt_int, f"ref_{tgt_int}")
+            tr_el.set("source", src_id)
+            tr_el.set("target", tgt_id)
+            if t.get("isChecked") or t.get("checked"):
+                etree.SubElement(tr_el, f"{{{NS}}}isChecked")
     except Exception:
         pass
 
@@ -351,7 +417,6 @@ def import_xml(
                             pass
                 except Exception:
                     pass
-            session_manager.append_change(project_id, "import_xml_replace", None, "replace")
 
     # Merge: upsert by oid
     # We will iterate over each xml_tag and create/update
@@ -375,7 +440,7 @@ def import_xml(
                         continue
                     try:
                         oid = _parse_oid(oid_s)
-                    except:
+                    except ValueError:
                         errors.append({"tag": xml_tag, "oid": oid_s, "error": "invalid oid"})
                         continue
                     name_el = el.find(f"{{{NS}}}name")
@@ -387,37 +452,6 @@ def import_xml(
                     row = {"oid": oid, "name": name}
                     if desc is not None:
                         row["description"] = desc
-                    # Type-specific defaults for required FKs to avoid constraint violations
-                    if typ == "information_requirement":
-                        row.setdefault("relevantConcept", "concept")
-                        row.setdefault("avgLifeTimeTime", 1)
-                        row.setdefault("maxLifeTimeTime", 1)
-                        row.setdefault("importance", 1)
-                        row.setdefault("urgency", 1)
-                        row.setdefault("status", 1)
-                        row.setdefault("stability", 1)
-                        row.setdefault("avgLifeTimeValue", 0.0)
-                        row.setdefault("maxLifeTimeValue", 0.0)
-                        row.setdefault("avgOcurrences", 0.0)
-                        row.setdefault("maxOcurrences", 0.0)
-                    elif typ == "use_case":
-                        row.setdefault("importance", 1)
-                        row.setdefault("urgency", 1)
-                        row.setdefault("status", 1)
-                        row.setdefault("stability", 1)
-                        row.setdefault("frequencyTime", 1)
-                        row.setdefault("triggeringEvent", "event")
-                        row.setdefault("precondition", "pre")
-                        row.setdefault("postcondition", "post")
-                        row.setdefault("frequencyValue", 1.0)
-                    elif typ == "stakeholder":
-                        row.setdefault("stakeholderRole", "role")
-                    elif typ == "objective":
-                        row.setdefault("importance", 1)
-                        row.setdefault("urgency", 1)
-                        row.setdefault("status", 1)
-                        row.setdefault("stability", 1)
-                        row.setdefault("description", "desc")
                     try:
                         existing_rows = export_table(db_path, table)
                         exists = any(int(r.get("oid", -1)) == oid for r in existing_rows)
@@ -495,10 +529,41 @@ def import_xml(
                         imported += 1
                     except Exception as e:
                         errors.append({"trace_oid": oid_i, "error": str(e)})
-            session_manager.append_change(project_id, "import_xml", None, "xml")
+            # PreparedFor / PreparedBy
+            for tag_name, jtable in [("preparedFor", "IsPreparedFor"), ("preparedBy", "IsPreparedBy")]:
+                elems = doc.findall(f".//{{{NS}}}{tag_name}")
+                for el in elems:
+                    parent_doc = el.getparent()
+                    doc_oid_s = parent_doc.get("oid") if parent_doc is not None else "1"
+                    try:
+                        doc_oid = _parse_oid(doc_oid_s)
+                    except Exception:
+                        doc_oid = 1
+                    orgs_attr = el.get("organizations", "")
+                    org_ids = orgs_attr.split()
+                    for org_s in org_ids:
+                        try:
+                            org_oid = _parse_oid(org_s)
+                        except Exception:
+                            continue
+                        try:
+                            existing_j = export_table(db_path, jtable)
+                            already = any(
+                                int(r.get("document", -1) or -1) == doc_oid and int(r.get("organization", -1) or -1) == org_oid
+                                for r in existing_j
+                            )
+                        except Exception:
+                            already = False
+                        if not already:
+                            new_j_oid = max_oid(db_path, jtable) + 1
+                            sql_j = f"INSERT INTO [{jtable}] ([oid], [document], [organization]) VALUES ({new_j_oid}, {doc_oid}, {org_oid})"
+                            try:
+                                execute_sql(db_path, sql_j)
+                                imported += 1
+                            except Exception as e:
+                                errors.append({"table": jtable, "error": str(e)})
         except Exception as e:
             # Rollback
-            ctx.__exit__(type(e), e, e.__traceback__)
             raise
         else:
             ctx.__exit__(None, None, None)

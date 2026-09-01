@@ -5,14 +5,23 @@ from __future__ import annotations
 import shutil
 from typing import Any
 
+import datetime
+
 from ..config import DEFAULT_LIMIT, get_base_template_path, resolve_project_path
-from ..jet.mdbtools import execute_sql, export_table
+from ..jet.mdbtools import execute_sql, export_table, sql_escape
+
+
+DEFAULT_DOC_SPECS = [
+    ("C_RequirementsSpecification", "c_requirements_specification"),
+    ("D_RequirementsSpecification", "d_requirements_specification"),
+    ("DefectsSpecification", "defects_specification"),
+    ("ChangeRequestsSpecification", "change_requests_specification"),
+]
 
 
 def project_create(session_manager, template: str, target_path: str, name: str) -> dict[str, Any]:
-    template_name = "english" if template.lower() == "empty" else template
     try:
-        src = get_base_template_path(template_name)
+        src = get_base_template_path(template)
     except FileNotFoundError as e:
         raise ValueError(f"Invalid template {template}") from e
     dst = resolve_project_path(target_path)
@@ -20,19 +29,23 @@ def project_create(session_manager, template: str, target_path: str, name: str) 
         raise ValueError(f"Target already exists: {target_path}")
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
-    # TODO: update name in spec docs? For now set via DB update if possible
     pid = session_manager.open_project(str(dst))
-    # Try to update name of first spec
-    for tbl in ["C_RequirementsSpecification", "D_RequirementsSpecification"]:
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for tbl, entity_type in DEFAULT_DOC_SPECS:
         rows = export_table(str(dst), tbl)
-        if rows:
-            oid = rows[0].get("oid")
-            if oid is not None:
-                esc_name = name.replace("'", "''")
-                execute_sql(str(dst), f"UPDATE [{tbl}] SET [name]='{esc_name}' WHERE [oid]={oid}")
-            break
+        if not rows:
+            next_oid = 1
+            sql_ins = (
+                f"INSERT INTO [{tbl}] "
+                f"([oid], [name], [versionMajor], [versionMinor], [versionDate]) "
+                f"VALUES ({next_oid}, {sql_escape(name)}, 1, 0, {sql_escape(now_str)})"
+            )
+            execute_sql(str(dst), sql_ins)
+            session_manager.append_change(pid, "project_create", next_oid, entity_type, "C")
+        elif tbl == "C_RequirementsSpecification":
+            c_oid = int(rows[0]["oid"])
+            execute_sql(str(dst), f"UPDATE [{tbl}] SET [name]={sql_escape(name)} WHERE [oid]={c_oid}")
     return {"project_id": pid, "path": str(dst), "name": name}
-
 
 def project_clone(session_manager, project_id: str, target_path: str) -> dict[str, Any]:
     session = session_manager.get(project_id)
